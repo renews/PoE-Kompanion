@@ -50,6 +50,7 @@ COPY PoE-Kompanion/ ./
 COPY poe-kompanion.png .
 COPY poe-kompanion.desktop .
 COPY dockerfile-inner-build.sh .
+COPY scripts/ ./scripts/
 
 # Set .NET environment variables
 ENV DOTNET_CLI_HOME=/tmp \

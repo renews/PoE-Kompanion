@@ -1,0 +1,66 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    echo "Usage: $0 <poe-pid> <remote-address> <remote-port>" >&2
+    exit 2
+}
+
+if [ "$#" -ne 3 ]; then
+    usage
+fi
+
+pid="$1"
+remote_addr="$2"
+remote_port="$3"
+ss_path="/usr/bin/ss"
+
+case "$pid" in
+    ''|*[!0-9]*) usage ;;
+esac
+
+case "$remote_port" in
+    ''|*[!0-9]*) usage ;;
+esac
+
+if [ "$remote_port" -lt 1 ] || [ "$remote_port" -gt 65535 ]; then
+    usage
+fi
+
+case "$remote_addr" in
+    ''|*[!0-9A-Fa-f:.]*) usage ;;
+esac
+
+if [ ! -r "/proc/$pid/comm" ] || [ ! -r "/proc/$pid/cmdline" ]; then
+    echo "PID $pid is not readable" >&2
+    exit 1
+fi
+
+IFS= read -r process_name < "/proc/$pid/comm" || process_name=""
+command_line="$(/usr/bin/tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+
+is_poe_process=0
+case "$process_name" in
+    PathOfExile*) is_poe_process=1 ;;
+    Main)
+        case "$command_line" in
+            *PathOfExileSteam.exe*|*PathOfExile_x64Steam.exe*|*PathOfExile.exe*|*PathOfExile_x64.exe*) is_poe_process=1 ;;
+        esac
+        ;;
+esac
+
+if [ "$is_poe_process" -ne 1 ]; then
+    echo "PID $pid is not a supported Path of Exile process" >&2
+    exit 1
+fi
+
+socket_info="$("$ss_path" -Hntp dst "$remote_addr" dport "$remote_port" 2>/dev/null || true)"
+case "$socket_info" in
+    *"pid=$pid,"*) ;;
+    *)
+        echo "Connection is not owned by the supplied Path of Exile process" >&2
+        exit 1
+        ;;
+esac
+
+exec "$ss_path" -K dst "$remote_addr" dport "$remote_port"

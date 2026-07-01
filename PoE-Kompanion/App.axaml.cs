@@ -84,10 +84,24 @@ public class App : Application
     {
         this.config = await ConfigurationManager.LoadAsync();
 
+        await this.EnsureLogoutHelperInstalledAsync();
         this.StartBackgroundProcess(backgroundProcessPath);
         this.ipc = await UnixSocketIpc.CreateServerAsync();
         this.StartMainHook();
         _ = this.ListenForIpcMessagesAsync();
+    }
+
+    private async Task EnsureLogoutHelperInstalledAsync()
+    {
+        var result = await LogoutHelperInstaller.EnsureInstalledForCurrentUserAsync(Program.GetInstallerExecutablePath());
+        if (result == LogoutHelperSetupResult.Installed)
+        {
+            NotificationManager.SendInfo("Logout helper installed");
+        }
+        else if (result == LogoutHelperSetupResult.Failed)
+        {
+            NotificationManager.SendError("Logout helper setup failed", "Logout will not work until the helper is installed.");
+        }
     }
 
     private async Task ListenForIpcMessagesAsync()
@@ -309,26 +323,9 @@ public class App : Application
 
         try
         {
-            var display = Environment.GetEnvironmentVariable("DISPLAY") ?? ":0";
-            var xauthority = Environment.GetEnvironmentVariable("XAUTHORITY") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".Xauthority");
-            var disableVirtualKeyboard = Environment.GetEnvironmentVariable("DISABLE_VIRTUAL_KEYBOARD") ?? "0";
-
             this.bgProcess = new Process
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "sudo",
-                    Environment =
-                    {
-                        {"APPIMAGELAUNCHER_DISABLE", "1"},
-                        {"DISPLAY", display},
-                        {"XAUTHORITY", xauthority},
-                        {"DISABLE_VIRTUAL_KEYBOARD", disableVirtualKeyboard},
-                    },
-                    Arguments = $"-n --preserve-env=APPIMAGELAUNCHER_DISABLE,DISPLAY,XAUTHORITY,DISABLE_VIRTUAL_KEYBOARD {path} --bg {currentPid}",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                },
+                StartInfo = BackgroundProcessStartInfoFactory.Create(path, currentPid),
             };
             this.bgProcess.Start();
 
@@ -340,38 +337,7 @@ public class App : Application
 
                 if (this.bgProcess.ExitCode != 0)
                 {
-                    try
-                    {
-                        this.bgProcess = new Process
-                        {
-                            StartInfo = new ProcessStartInfo
-                            {
-                                FileName = "pkexec",
-                                Arguments = $"{path} --bg {currentPid}",
-                                UseShellExecute = false,
-                                CreateNoWindow = true,
-                            },
-                        };
-                        this.bgProcess.Start();
-
-                        this.bgProcess.WaitForExit();
-
-                        if (this.isShuttingDown) return;
-
-                        if (this.bgProcess.ExitCode != 0)
-                        {
-                            NotifyInitializationError();
-                        }
-                        else
-                        {
-                            NotifyInitializationSuccess();
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        if (this.isShuttingDown) return;
-                        NotifyInitializationError();
-                    }
+                    NotifyInitializationError();
                 }
                 else
                 {
@@ -381,41 +347,8 @@ public class App : Application
         }
         catch (Exception)
         {
-            try
-            {
-                this.bgProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "pkexec",
-                        Arguments = $"{path} --bg {currentPid}",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    },
-                };
-                this.bgProcess.Start();
-
-                _ = Task.Run(() =>
-                {
-                    this.bgProcess.WaitForExit();
-
-                    if (this.isShuttingDown) return;
-
-                    if (this.bgProcess.ExitCode != 0)
-                    {
-                        NotifyInitializationError();
-                    }
-                    else
-                    {
-                        NotifyInitializationSuccess();
-                    }
-                });
-            }
-            catch (Exception)
-            {
-                if (this.isShuttingDown) return;
-                NotifyInitializationError();
-            }
+            if (this.isShuttingDown) return;
+            NotifyInitializationError();
         }
     }
 

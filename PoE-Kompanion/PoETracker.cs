@@ -89,8 +89,7 @@ internal sealed class PoETracker
 
     private void FindPoEExecutable()
     {
-        // Filter for process with PathOfExileSteam in command line
-        var proc = Process.GetProcesses().FirstOrDefault(p => p.ProcessName.StartsWith("PathOfExileSte"));
+        var proc = Process.GetProcesses().FirstOrDefault(IsPathOfExileProcess);
         var oldProcId = this.poeProcess?.Id;
         this.poeProcess = proc;
 
@@ -110,6 +109,27 @@ internal sealed class PoETracker
         }
     }
 
+    private static bool IsPathOfExileProcess(Process process)
+    {
+        var commandLine = GetCommandLine(process.Id);
+        return PoEProcessDetector.IsPathOfExileProcess(process.ProcessName, commandLine);
+    }
+
+    private static string? GetCommandLine(int processId)
+    {
+        try
+        {
+            var path = $"/proc/{processId}/cmdline";
+            if (!File.Exists(path)) return null;
+
+            return File.ReadAllText(path).Replace('\0', ' ').Trim();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     private async Task FindGameConnections()
     {
         if (this.poeProcess is null) return;
@@ -119,6 +139,11 @@ internal sealed class PoETracker
 
         var newOpenedConnections = new List<OpenedPoEConnection>();
         await foreach (var openedConn in FindGameOpenedConnections($"/proc/{pid}/net/tcp", inodes, "TCP"))
+        {
+            newOpenedConnections.Add(openedConn);
+        }
+
+        await foreach (var openedConn in FindGameOpenedConnections($"/proc/{pid}/net/tcp6", inodes, "TCP6"))
         {
             newOpenedConnections.Add(openedConn);
         }
@@ -150,49 +175,78 @@ internal sealed class PoETracker
 
     private async Task CloseGameConnections()
     {
+        var pid = this.poeProcess?.Id;
+        if (pid is null) return;
+
         foreach (var connection in this.openedPoEConnections)
         {
-            SendRstPacket(connection);
+            SendRstPacket(pid.Value, connection);
         }
 
         this.FindPoEExecutable();
         await this.FindGameConnections();
 
+        pid = this.poeProcess?.Id;
+        if (pid is null) return;
+
         foreach (var connection in this.openedPoEConnections)
         {
-            SendRstPacket(connection);
+            SendRstPacket(pid.Value, connection);
         }
 
         Console.WriteLine("Killed All PoE Connections");
         this.openedPoEConnections.Clear();
     }
 
-    private static void SendRstPacket(OpenedPoEConnection openedPoEConnection)
+    private static void SendRstPacket(int processId, OpenedPoEConnection openedPoEConnection)
     {
         try
         {
-            // Use ss to kill the connection
-            var proc = new Process
+            var directResult = RunSocketKill(SocketKillProcessStartInfoFactory.CreateDirect(openedPoEConnection.RemoteAddr, openedPoEConnection.RemotePort));
+            if (directResult.Succeeded)
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "bash",
-                    Arguments = $"-c \"sudo ss -K dst {openedPoEConnection.RemoteAddr} dport {openedPoEConnection.RemotePort}\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                },
-            };
-            proc.Start();
-            proc.WaitForExit();
+                Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+                return;
+            }
 
-            Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+            var helperResult = RunSocketKill(SocketKillProcessStartInfoFactory.CreateHelper(processId, openedPoEConnection.RemoteAddr, openedPoEConnection.RemotePort));
+            if (helperResult.Succeeded)
+            {
+                Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+                return;
+            }
+
+            Console.WriteLine($"Warning: failed to close connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+            Console.WriteLine(helperResult.CombinedOutput);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Warning: {ex.Message}");
         }
+    }
+
+    private static SocketKillResult RunSocketKill(ProcessStartInfo startInfo)
+    {
+        var proc = new Process
+        {
+            StartInfo = startInfo,
+        };
+
+        proc.Start();
+        var output = proc.StandardOutput.ReadToEnd();
+        var error = proc.StandardError.ReadToEnd();
+        proc.WaitForExit();
+
+        return new SocketKillResult(proc.ExitCode, output, error);
+    }
+
+    private sealed record SocketKillResult(int ExitCode, string Output, string Error)
+    {
+        public string CombinedOutput => $"{this.Output}{this.Error}";
+
+        public bool Succeeded =>
+            this.ExitCode == 0 &&
+            !this.CombinedOutput.Contains("Operation not permitted", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<HashSet<string>> GetInodesForPid(int pid)
@@ -280,26 +334,15 @@ internal sealed class PoETracker
             // var localPort = int.Parse(parts[1].Split(':')[1], System.Globalization.NumberStyles.HexNumber);
             string? localAddr = null;
             int? localPort = null;
-            var remoteAddr = HexToIp(parts[2].Split(':')[0]);
+            var remoteAddr = ProcNetTcpAddressParser.HexToIp(parts[2].Split(':')[0]);
             var remotePort = int.Parse(parts[2].Split(':')[1], System.Globalization.NumberStyles.HexNumber);
 
             // Only show connections to non-localhost addresses
-            if (!remoteAddr.StartsWith("127.") && remoteAddr != "0.0.0.0")
+            if (ProcNetTcpAddressParser.IsRemoteAddress(remoteAddr))
             {
                 yield return new OpenedPoEConnection(protocol, localAddr, localPort, remoteAddr, remotePort);
             }
         }
-    }
-
-    private static string HexToIp(string hex)
-    {
-        var bytes = new byte[4];
-        for (var i = 0; i < 4; ++i)
-        {
-            bytes[3 - i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-
-        return string.Join(".", bytes);
     }
 
     // ReSharper disable NotAccessedPositionalProperty.Local

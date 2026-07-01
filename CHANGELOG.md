@@ -5,6 +5,21 @@ All notable changes to PoE Kompanion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-01
+
+### Added
+- One-time privileged logout helper installation for Linux AppImage builds.
+- Path of Exile 1 and Path of Exile 2 process detection for Proton and native process names.
+
+### Fixed
+- AppImage startup on CachyOS/Niri by running the NativeAOT payload from a real filesystem.
+- Logout hotkey behavior on systems where killing TCP connections requires elevated privileges.
+- IPC socket startup crashes caused by stale root-owned sockets in global `/tmp`.
+
+### Changed
+- IPC sockets now live in per-user runtime directories.
+- Background process starts unprivileged; only the logout helper uses narrow passwordless sudo after setup.
+
 ## [0.2.2] - 2025-11-24
 
 ### Changed
@@ -67,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unix domain socket IPC for process communication
 - Background process runs with CAP_NET_ADMIN capability for network operations
 
+[1.0.0]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.2.2...v1.0.0
 [0.2.2]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.1.0...v0.2.0
