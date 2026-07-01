@@ -2,6 +2,7 @@ namespace PoEKompanion.Tests;
 
 using System;
 using System.Linq;
+using System.Reflection;
 
 using PoEKompanion;
 
@@ -9,6 +10,11 @@ internal static class Program
 {
     private static int Main()
     {
+        AssertEqual(
+            "1.0.0",
+            typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            "Assembly informational version should match release version");
+
         AssertMatches(
             "Main",
             @"S:\common\Path of Exile 2\PathOfExileSteam.exe --nopatch",
