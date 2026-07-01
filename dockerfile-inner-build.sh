@@ -27,13 +27,21 @@ for lib in bin/Release/net9.0/linux-x64/publish/*.so; do
     fi
 done
 
-LINUXDEPLOY_ARGS+=(--output appimage)
+# Stage AppDir
+echo "Staging AppDir with linuxdeploy..."
+/usr/local/linuxdeploy/AppRun "${LINUXDEPLOY_ARGS[@]}"
+
+# NativeAOT executables can crash with SIGBUS when run from the AppImage FUSE mount.
+# Replace linuxdeploy's AppRun symlink with a wrapper that copies the payload to a
+# real filesystem before executing it.
+echo "Installing AppImage AppRun wrapper..."
+sh ./scripts/install-appimage-wrapper.sh AppDir
 
 # Create AppImage
-echo "Creating AppImage with linuxdeploy..."
+echo "Creating AppImage with appimagetool..."
 OUTPUT_NAME="PoE_Kompanion-x86_64.AppImage" \
 ARCH=x86_64 \
-/usr/local/linuxdeploy/AppRun "${LINUXDEPLOY_ARGS[@]}"
+/usr/local/linuxdeploy/plugins/linuxdeploy-plugin-appimage/usr/bin/appimagetool AppDir
 
 # Rename AppImage to versioned name
 APPIMAGE_NAME="PoE-Kompanion-${VERSION}-x86_64.AppImage"
