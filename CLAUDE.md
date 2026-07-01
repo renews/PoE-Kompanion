@@ -28,10 +28,10 @@
   - Use `UPPER_SNAKE_CASE` for private const fields
   ```csharp
   // Good
-  private const string SERVER_SOCKET_PATH = "/tmp/poe-kompanion-server.sock";
+  private const string HELPER_PATH = "/usr/local/libexec/poe-kompanion-kill-connection";
 
   // Bad
-  private const string ServerSocketPath = "/tmp/poe-kompanion-server.sock";
+  private const string HelperPath = "/usr/local/libexec/poe-kompanion-kill-connection";
   ```
 - **Method visibility**: Make methods `static` when they don't access instance state
   ```csharp

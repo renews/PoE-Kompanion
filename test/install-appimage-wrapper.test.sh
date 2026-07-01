@@ -20,6 +20,8 @@ printf 'appimage=%s\n' "${APPIMAGE:-}"
 printf 'args=%s\n' "$*"
 printf 'ld=%s\n' "${LD_LIBRARY_PATH:-}"
 printf 'shell=%s\n' "${SHELL:-}"
+printf 'appdir=%s\n' "${POE_KOMPANION_APPDIR:-}"
+printf 'appimage_path=%s\n' "${POE_KOMPANION_APPIMAGE:-}"
 EOF
 chmod +x "$appdir/usr/bin/PoEKompanion"
 printf 'fake library\n' > "$appdir/usr/lib/libfake.so"
@@ -75,6 +77,24 @@ case "$output" in
     *"shell=$expected_shell"*) ;;
     *)
         echo "Expected wrapper to normalize SHELL to an absolute path for pkexec"
+        echo "$output"
+        exit 1
+        ;;
+esac
+
+case "$output" in
+    *"appdir=$appdir"*) ;;
+    *)
+        echo "Expected wrapper to expose original AppDir for bundled helper setup"
+        echo "$output"
+        exit 1
+        ;;
+esac
+
+case "$output" in
+    *"appimage_path=/tmp/PoE-Kompanion.AppImage"*) ;;
+    *)
+        echo "Expected wrapper to expose original AppImage path for automatic helper setup"
         echo "$output"
         exit 1
         ;;

@@ -31,6 +31,11 @@ done
 echo "Staging AppDir with linuxdeploy..."
 /usr/local/linuxdeploy/AppRun "${LINUXDEPLOY_ARGS[@]}"
 
+echo "Installing logout helper setup scripts..."
+mkdir -p AppDir/usr/share/poe-kompanion
+install -m 755 scripts/install-logout-helper.sh AppDir/usr/share/poe-kompanion/
+install -m 755 scripts/poe-kompanion-kill-connection AppDir/usr/share/poe-kompanion/
+
 # NativeAOT executables can crash with SIGBUS when run from the AppImage FUSE mount.
 # Replace linuxdeploy's AppRun symlink with a wrapper that copies the payload to a
 # real filesystem before executing it.

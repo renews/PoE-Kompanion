@@ -29,6 +29,7 @@ fi
 user_id="$(id -u 2>/dev/null || printf '%s' "${USER:-user}")"
 runtime_base="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
 payload_dir="$runtime_base/poe-kompanion-appimage-$user_id"
+original_appimage="${APPIMAGE:-}"
 
 mkdir -p "$payload_dir/usr/bin" "$payload_dir/usr/lib"
 
@@ -55,6 +56,11 @@ if [ -n "${LD_LIBRARY_PATH:-}" ]; then
     export LD_LIBRARY_PATH="$payload_dir/usr/lib:$LD_LIBRARY_PATH"
 else
     export LD_LIBRARY_PATH="$payload_dir/usr/lib"
+fi
+
+export POE_KOMPANION_APPDIR="$appdir_path"
+if [ -n "$original_appimage" ]; then
+    export POE_KOMPANION_APPIMAGE="$original_appimage"
 fi
 
 exec "$payload_dir/usr/bin/PoEKompanion" "$@"

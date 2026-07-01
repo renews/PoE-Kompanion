@@ -10,8 +10,6 @@ using MessagePack;
 
 public sealed class UnixSocketIpc : IDisposable
 {
-    private const string SERVER_SOCKET_PATH = "/tmp/poe-kompanion-server.sock";
-    private const string CLIENT_SOCKET_PATH = "/tmp/poe-kompanion-client.sock";
     private readonly Socket socket;
     private readonly string? localPath;
     private readonly UnixDomainSocketEndPoint? remoteEndPoint;
@@ -23,60 +21,70 @@ public sealed class UnixSocketIpc : IDisposable
         this.remoteEndPoint = remoteEndPoint;
     }
 
+    public static string GetServerSocketPath(string? runtimeDirectory = null, string? userName = null) =>
+        Path.Combine(GetSocketDirectory(runtimeDirectory, userName), "server.sock");
+
+    public static string GetClientSocketPath(string? runtimeDirectory = null, string? userName = null) =>
+        Path.Combine(GetSocketDirectory(runtimeDirectory, userName), "client.sock");
+
     public static async Task<UnixSocketIpc> CreateServerAsync()
     {
-        if (File.Exists(SERVER_SOCKET_PATH))
+        var serverSocketPath = GetServerSocketPath();
+        var clientSocketPath = GetClientSocketPath();
+        EnsureSocketDirectory(serverSocketPath);
+
+        if (File.Exists(serverSocketPath))
         {
-            File.Delete(SERVER_SOCKET_PATH);
+            File.Delete(serverSocketPath);
         }
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-        socket.Bind(new UnixDomainSocketEndPoint(SERVER_SOCKET_PATH));
+        socket.Bind(new UnixDomainSocketEndPoint(serverSocketPath));
 
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             // ReSharper disable once UseObjectOrCollectionInitializer
-            var serverSocketInfo = new FileInfo(SERVER_SOCKET_PATH);
-            serverSocketInfo.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
-                                            UnixFileMode.GroupRead | UnixFileMode.GroupWrite |
-                                            UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+            var serverSocketInfo = new FileInfo(serverSocketPath);
+            serverSocketInfo.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         }
 
-        while (!File.Exists(CLIENT_SOCKET_PATH))
+        while (!File.Exists(clientSocketPath))
         {
             await Task.Yield();
         }
 
-        var clientEndPoint = new UnixDomainSocketEndPoint(CLIENT_SOCKET_PATH);
-        return new UnixSocketIpc(socket, SERVER_SOCKET_PATH, clientEndPoint);
+        var clientEndPoint = new UnixDomainSocketEndPoint(clientSocketPath);
+        return new UnixSocketIpc(socket, serverSocketPath, clientEndPoint);
     }
 
     public static async Task<UnixSocketIpc> CreateClientAsync()
     {
-        if (File.Exists(CLIENT_SOCKET_PATH))
+        var serverSocketPath = GetServerSocketPath();
+        var clientSocketPath = GetClientSocketPath();
+        EnsureSocketDirectory(clientSocketPath);
+
+        if (File.Exists(clientSocketPath))
         {
-            File.Delete(CLIENT_SOCKET_PATH);
+            File.Delete(clientSocketPath);
         }
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Dgram, ProtocolType.Unspecified);
-        socket.Bind(new UnixDomainSocketEndPoint(CLIENT_SOCKET_PATH));
+        socket.Bind(new UnixDomainSocketEndPoint(clientSocketPath));
 
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             // ReSharper disable once UseObjectOrCollectionInitializer
-            var clientSocketInfo = new FileInfo(CLIENT_SOCKET_PATH);
-            clientSocketInfo.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
-                                            UnixFileMode.GroupRead | UnixFileMode.GroupWrite |
-                                            UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+            var clientSocketInfo = new FileInfo(clientSocketPath);
+            clientSocketInfo.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         }
 
-        while (!File.Exists(SERVER_SOCKET_PATH))
+        while (!File.Exists(serverSocketPath))
         {
             await Task.Yield();
         }
 
-        var serverEndPoint = new UnixDomainSocketEndPoint(SERVER_SOCKET_PATH);
-        return new UnixSocketIpc(socket, CLIENT_SOCKET_PATH, serverEndPoint);
+        var serverEndPoint = new UnixDomainSocketEndPoint(serverSocketPath);
+        return new UnixSocketIpc(socket, clientSocketPath, serverEndPoint);
     }
 
     public async Task SendAsync(IpcMessage message, CancellationToken cancellationToken = default)
@@ -112,6 +120,37 @@ public sealed class UnixSocketIpc : IDisposable
         if (this.localPath is not null && File.Exists(this.localPath))
         {
             File.Delete(this.localPath);
+        }
+    }
+
+    private static string GetSocketDirectory(string? runtimeDirectory = null, string? userName = null)
+    {
+        runtimeDirectory ??= Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (!string.IsNullOrWhiteSpace(runtimeDirectory))
+        {
+            return Path.Combine(runtimeDirectory, "poe-kompanion");
+        }
+
+        userName ??= CurrentUser.GetName();
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            userName = CurrentUser.GetEffectiveUserIdSegment();
+        }
+
+        return Path.Combine(Path.GetTempPath(), $"poe-kompanion-{userName}");
+    }
+
+    private static void EnsureSocketDirectory(string socketPath)
+    {
+        var directory = Path.GetDirectoryName(socketPath);
+        if (directory is null) return;
+
+        Directory.CreateDirectory(directory);
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            // ReSharper disable once UseObjectOrCollectionInitializer
+            var directoryInfo = new DirectoryInfo(directory);
+            directoryInfo.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
         }
     }
 }

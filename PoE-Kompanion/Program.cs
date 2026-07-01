@@ -32,12 +32,26 @@ internal static class Program
         return Path.GetFullPath(Path.Join(AppDomain.CurrentDomain.BaseDirectory, AppDomain.CurrentDomain.FriendlyName));
     }
 
+    public static string GetInstallerExecutablePath()
+    {
+        var appImagePath = Environment.GetEnvironmentVariable("POE_KOMPANION_APPIMAGE");
+        if (!string.IsNullOrEmpty(appImagePath) && File.Exists(appImagePath)) return appImagePath;
+
+        return GetExecutablePath();
+    }
+
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
     public static async Task Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--install-logout-helper")
+        {
+            Environment.ExitCode = await LogoutHelperInstaller.RunAsync(args.Skip(1).ToArray());
+            return;
+        }
+
         var path = GetExecutablePath();
         var currentProcess = Process.GetCurrentProcess();
 

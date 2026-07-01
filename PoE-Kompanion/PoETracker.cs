@@ -175,49 +175,78 @@ internal sealed class PoETracker
 
     private async Task CloseGameConnections()
     {
+        var pid = this.poeProcess?.Id;
+        if (pid is null) return;
+
         foreach (var connection in this.openedPoEConnections)
         {
-            SendRstPacket(connection);
+            SendRstPacket(pid.Value, connection);
         }
 
         this.FindPoEExecutable();
         await this.FindGameConnections();
 
+        pid = this.poeProcess?.Id;
+        if (pid is null) return;
+
         foreach (var connection in this.openedPoEConnections)
         {
-            SendRstPacket(connection);
+            SendRstPacket(pid.Value, connection);
         }
 
         Console.WriteLine("Killed All PoE Connections");
         this.openedPoEConnections.Clear();
     }
 
-    private static void SendRstPacket(OpenedPoEConnection openedPoEConnection)
+    private static void SendRstPacket(int processId, OpenedPoEConnection openedPoEConnection)
     {
         try
         {
-            // Use ss to kill the connection
-            var proc = new Process
+            var directResult = RunSocketKill(SocketKillProcessStartInfoFactory.CreateDirect(openedPoEConnection.RemoteAddr, openedPoEConnection.RemotePort));
+            if (directResult.Succeeded)
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "bash",
-                    Arguments = $"-c \"sudo ss -K dst {openedPoEConnection.RemoteAddr} dport {openedPoEConnection.RemotePort}\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                },
-            };
-            proc.Start();
-            proc.WaitForExit();
+                Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+                return;
+            }
 
-            Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+            var helperResult = RunSocketKill(SocketKillProcessStartInfoFactory.CreateHelper(processId, openedPoEConnection.RemoteAddr, openedPoEConnection.RemotePort));
+            if (helperResult.Succeeded)
+            {
+                Console.WriteLine($"Closed connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+                return;
+            }
+
+            Console.WriteLine($"Warning: failed to close connection to {openedPoEConnection.RemoteAddr}:{openedPoEConnection.RemotePort}");
+            Console.WriteLine(helperResult.CombinedOutput);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Warning: {ex.Message}");
         }
+    }
+
+    private static SocketKillResult RunSocketKill(ProcessStartInfo startInfo)
+    {
+        var proc = new Process
+        {
+            StartInfo = startInfo,
+        };
+
+        proc.Start();
+        var output = proc.StandardOutput.ReadToEnd();
+        var error = proc.StandardError.ReadToEnd();
+        proc.WaitForExit();
+
+        return new SocketKillResult(proc.ExitCode, output, error);
+    }
+
+    private sealed record SocketKillResult(int ExitCode, string Output, string Error)
+    {
+        public string CombinedOutput => $"{this.Output}{this.Error}";
+
+        public bool Succeeded =>
+            this.ExitCode == 0 &&
+            !this.CombinedOutput.Contains("Operation not permitted", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<HashSet<string>> GetInodesForPid(int pid)
