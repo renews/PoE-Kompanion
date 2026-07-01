@@ -7,6 +7,14 @@ Aim to be a replacement to Lutcikaur's amazing [LutBot](http://lutbot.com).
 
 ![settings-screenshot.png](Doc/settings-screenshot.png)
 
+## Why It Asks for a Password
+
+PoE Kompanion needs elevated permission to close the game's TCP connection for instant logout on Linux.
+
+On first launch, the AppImage installs a small logout helper with administrator permission. After that, the app can trigger logout without asking for a password during gameplay.
+
+The helper is limited to the logout action and checks that the target process is Path of Exile before closing its connection.
+
 ## Building from Source
 
 ### Prerequisites
