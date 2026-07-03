@@ -77,7 +77,7 @@ internal sealed class PoETracker
             }
             else if (message is ChatCommandMessage chatCommand)
             {
-                await this.virtualKeyboard.SendChatCommandAsync(chatCommand.Command);
+                await this.virtualKeyboard.SendChatCommandAsync(chatCommand.Command, chatCommand.MinimumSubmitDelayMs);
             }
             else if (message is KeyboardLayoutMapMessage layoutMapMessage)
             {

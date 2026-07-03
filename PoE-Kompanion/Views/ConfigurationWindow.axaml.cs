@@ -63,6 +63,66 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
         }
     }
 
+    public HotkeyCombo? ChatCommand1Hotkey
+    {
+        get => this.GetChatCommandHotkey(0);
+        set => this.SetChatCommandHotkey(0, value);
+    }
+
+    public string ChatCommand1Command
+    {
+        get => this.GetChatCommandCommand(0);
+        set => this.SetChatCommandCommand(0, value);
+    }
+
+    public HotkeyCombo? ChatCommand2Hotkey
+    {
+        get => this.GetChatCommandHotkey(1);
+        set => this.SetChatCommandHotkey(1, value);
+    }
+
+    public string ChatCommand2Command
+    {
+        get => this.GetChatCommandCommand(1);
+        set => this.SetChatCommandCommand(1, value);
+    }
+
+    public HotkeyCombo? ChatCommand3Hotkey
+    {
+        get => this.GetChatCommandHotkey(2);
+        set => this.SetChatCommandHotkey(2, value);
+    }
+
+    public string ChatCommand3Command
+    {
+        get => this.GetChatCommandCommand(2);
+        set => this.SetChatCommandCommand(2, value);
+    }
+
+    public HotkeyCombo? ChatCommand4Hotkey
+    {
+        get => this.GetChatCommandHotkey(3);
+        set => this.SetChatCommandHotkey(3, value);
+    }
+
+    public string ChatCommand4Command
+    {
+        get => this.GetChatCommandCommand(3);
+        set => this.SetChatCommandCommand(3, value);
+    }
+
+    public HotkeyCombo? ChatCommand5Hotkey
+    {
+        get => this.GetChatCommandHotkey(4);
+        set => this.SetChatCommandHotkey(4, value);
+    }
+
+    public string ChatCommand5Command
+    {
+        get => this.GetChatCommandCommand(4);
+        set => this.SetChatCommandCommand(4, value);
+    }
+
 
     public ConfigurationWindow()
     {
@@ -118,8 +178,10 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
         var poeProcessId = App.Instance?.GetPoEProcessId();
         if (!poeProcessId.HasValue) return;
 
-        this.overlay = new InputBlockerOverlay(this);
-        this.overlay.PositionOverPoEWindow(poeProcessId.Value);
+        var overlay = new InputBlockerOverlay(this);
+        if (!overlay.PositionOverPoEWindow(poeProcessId.Value)) return;
+
+        this.overlay = overlay;
         this.overlay.Show();
 
         this.Activate();
@@ -169,6 +231,16 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
         this.OnPropertyChanged(nameof(this.OpenSettingsHotkey));
         this.OnPropertyChanged(nameof(this.HideoutHotkey));
         this.OnPropertyChanged(nameof(this.ExitHotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand1Hotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand1Command));
+        this.OnPropertyChanged(nameof(this.ChatCommand2Hotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand2Command));
+        this.OnPropertyChanged(nameof(this.ChatCommand3Hotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand3Command));
+        this.OnPropertyChanged(nameof(this.ChatCommand4Hotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand4Command));
+        this.OnPropertyChanged(nameof(this.ChatCommand5Hotkey));
+        this.OnPropertyChanged(nameof(this.ChatCommand5Command));
     }
     
     private async Task SaveConfiguration()
@@ -190,6 +262,28 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
     private void OnCancelClick(object? sender, RoutedEventArgs e)
     {
         this.Close();
+    }
+
+    private HotkeyCombo? GetChatCommandHotkey(int index) => this.currentConfig.ChatCommandHotkeys[index].Hotkey;
+
+    private void SetChatCommandHotkey(int index, HotkeyCombo? value, [CallerMemberName] string? propertyName = null)
+    {
+        var nextHotkey = value ?? ChatCommandHotkey.GetDefaults()[index].Hotkey;
+        if (this.currentConfig.ChatCommandHotkeys[index].Hotkey == nextHotkey) return;
+
+        this.currentConfig.ChatCommandHotkeys[index].Hotkey = nextHotkey;
+        this.OnPropertyChanged(propertyName);
+    }
+
+    private string GetChatCommandCommand(int index) => this.currentConfig.ChatCommandHotkeys[index].Command;
+
+    private void SetChatCommandCommand(int index, string? value, [CallerMemberName] string? propertyName = null)
+    {
+        var nextCommand = value ?? string.Empty;
+        if (this.currentConfig.ChatCommandHotkeys[index].Command == nextCommand) return;
+
+        this.currentConfig.ChatCommandHotkeys[index].Command = nextCommand;
+        this.OnPropertyChanged(propertyName);
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

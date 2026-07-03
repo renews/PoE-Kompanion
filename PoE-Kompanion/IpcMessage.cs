@@ -21,7 +21,8 @@ public sealed record ForceLogoutMessage : IpcMessage;
 
 [MessagePackObject]
 public sealed record ChatCommandMessage(
-    [property: Key(0)] string Command
+    [property: Key(0)] string Command,
+    [property: Key(1)] int MinimumSubmitDelayMs = 0
 ) : IpcMessage;
 
 [MessagePackObject]

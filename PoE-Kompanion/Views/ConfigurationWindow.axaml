@@ -45,8 +45,12 @@
                         <MultiBinding Converter="{x:Static BoolConverters.And}">
                             <Binding Path="!#LogoutHotkeyPicker.IsListening" />
                             <Binding Path="!#SettingsHotkeyPicker.IsListening" />
-                            <Binding Path="!#HideoutHotkeyPicker.IsListening" />
                             <Binding Path="!#ExitHotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand1HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand2HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand3HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand4HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand5HotkeyPicker.IsListening" />
                         </MultiBinding>
                     </Button.IsEnabled>
                 </Button>
@@ -61,15 +65,19 @@
                         <MultiBinding Converter="{x:Static BoolConverters.And}">
                             <Binding Path="!#LogoutHotkeyPicker.IsListening" />
                             <Binding Path="!#SettingsHotkeyPicker.IsListening" />
-                            <Binding Path="!#HideoutHotkeyPicker.IsListening" />
                             <Binding Path="!#ExitHotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand1HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand2HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand3HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand4HotkeyPicker.IsListening" />
+                            <Binding Path="!#ChatCommand5HotkeyPicker.IsListening" />
                         </MultiBinding>
                     </Button.IsEnabled>
                 </Button>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20"
-                  RowDefinitions="Auto, Auto, Auto, Auto" RowSpacing="10"
+            <Grid ColumnDefinitions="200,150" ColumnSpacing="6"
+                  RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto" RowSpacing="10"
                   Margin="0 10 0 20">
                 <Label Grid.Column="0" Grid.Row="0" Content="Logout:" />
                 <controls:HotkeyPickerButton
@@ -83,17 +91,66 @@
                     Grid.Column="1" Grid.Row="1"
                     SelectedHotkey="{Binding OpenSettingsHotkey}" />
 
-                <Label Grid.Column="0" Grid.Row="2" Content="Hideout:" />
-                <controls:HotkeyPickerButton
-                    Name="HideoutHotkeyPicker"
-                    Grid.Column="1" Grid.Row="2"
-                    SelectedHotkey="{Binding HideoutHotkey}" />
-
-                <Label Grid.Column="0" Grid.Row="3" Content="Exit:" />
+                <Label Grid.Column="0" Grid.Row="2" Content="Exit:" />
                 <controls:HotkeyPickerButton
                     Name="ExitHotkeyPicker"
-                    Grid.Column="1" Grid.Row="3"
+                    Grid.Column="1" Grid.Row="2"
                     SelectedHotkey="{Binding ExitHotkey}" />
+
+                <Label Grid.Column="0" Grid.Row="3" Grid.ColumnSpan="2" Content="Custom Commands:" Margin="0,10,0,0" />
+
+                <TextBlock Grid.Column="0" Grid.Row="4" Text="Command" Classes="PoEHeading" />
+                <TextBlock Grid.Column="1" Grid.Row="4" Text="Shortcut" Classes="PoEHeading" />
+
+                <TextBox
+                    Grid.Column="0" Grid.Row="5"
+                    MinWidth="190"
+                    Text="{Binding ChatCommand1Command, UpdateSourceTrigger=PropertyChanged}"
+                    Watermark="/played" />
+                <controls:HotkeyPickerButton
+                    Name="ChatCommand1HotkeyPicker"
+                    Grid.Column="1" Grid.Row="5"
+                    SelectedHotkey="{Binding ChatCommand1Hotkey}" />
+
+                <TextBox
+                    Grid.Column="0" Grid.Row="6"
+                    MinWidth="190"
+                    Text="{Binding ChatCommand2Command, UpdateSourceTrigger=PropertyChanged}"
+                    Watermark="/remaining" />
+                <controls:HotkeyPickerButton
+                    Name="ChatCommand2HotkeyPicker"
+                    Grid.Column="1" Grid.Row="6"
+                    SelectedHotkey="{Binding ChatCommand2Hotkey}" />
+
+                <TextBox
+                    Grid.Column="0" Grid.Row="7"
+                    MinWidth="190"
+                    Text="{Binding ChatCommand3Command, UpdateSourceTrigger=PropertyChanged}"
+                    Watermark="/deaths" />
+                <controls:HotkeyPickerButton
+                    Name="ChatCommand3HotkeyPicker"
+                    Grid.Column="1" Grid.Row="7"
+                    SelectedHotkey="{Binding ChatCommand3Hotkey}" />
+
+                <TextBox
+                    Grid.Column="0" Grid.Row="8"
+                    MinWidth="190"
+                    Text="{Binding ChatCommand4Command, UpdateSourceTrigger=PropertyChanged}"
+                    Watermark="/hideout" />
+                <controls:HotkeyPickerButton
+                    Name="ChatCommand4HotkeyPicker"
+                    Grid.Column="1" Grid.Row="8"
+                    SelectedHotkey="{Binding ChatCommand4Hotkey}" />
+
+                <TextBox
+                    Grid.Column="0" Grid.Row="9"
+                    MinWidth="190"
+                    Text="{Binding ChatCommand5Command, UpdateSourceTrigger=PropertyChanged}"
+                    Watermark="/leave" />
+                <controls:HotkeyPickerButton
+                    Name="ChatCommand5HotkeyPicker"
+                    Grid.Column="1" Grid.Row="9"
+                    SelectedHotkey="{Binding ChatCommand5Hotkey}" />
             </Grid>
 
         </DockPanel>

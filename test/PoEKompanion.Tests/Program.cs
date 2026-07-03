@@ -1,10 +1,12 @@
 namespace PoEKompanion.Tests;
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 
 using PoEKompanion;
+using SharpHook.Data;
 
 internal static class Program
 {
@@ -118,7 +120,134 @@ internal static class Program
             UnixSocketIpc.GetServerSocketPath(string.Empty, "appuser"),
             "Fallback IPC socket should be namespaced by user");
 
+        var defaultConfig = new ConfigurationModel();
+        AssertEqual(5, defaultConfig.ChatCommandHotkeys.Length, "Default config should expose five custom chat command hotkeys");
+        AssertEqual(KeyCode.VcF2, defaultConfig.ChatCommandHotkeys[0].Hotkey.Key, "First custom command hotkey should default to F2");
+        AssertEqual("/played", defaultConfig.ChatCommandHotkeys[0].Command, "First custom command should default to played");
+        AssertEqual(KeyCode.VcF3, defaultConfig.ChatCommandHotkeys[1].Hotkey.Key, "Second custom command hotkey should default to F3");
+        AssertEqual("/remaining", defaultConfig.ChatCommandHotkeys[1].Command, "Second custom command should default to remaining");
+        AssertEqual(KeyCode.VcF4, defaultConfig.ChatCommandHotkeys[2].Hotkey.Key, "Third custom command hotkey should default to F4");
+        AssertEqual("/deaths", defaultConfig.ChatCommandHotkeys[2].Command, "Third custom command should default to deaths");
+        AssertEqual(KeyCode.VcF5, defaultConfig.ChatCommandHotkeys[3].Hotkey.Key, "Fourth custom command hotkey should default to F5");
+        AssertEqual("/hideout", defaultConfig.ChatCommandHotkeys[3].Command, "Fourth custom command should default to hideout");
+        AssertEqual(KeyCode.VcF6, defaultConfig.ChatCommandHotkeys[4].Hotkey.Key, "Fifth custom command hotkey should default to F6");
+        AssertEqual("/leave", defaultConfig.ChatCommandHotkeys[4].Command, "Fifth custom command should default to leave");
+        AssertEqual(100, defaultConfig.ChatCommandHotkeys[0].MinimumSubmitDelayMs, "Custom commands should wait at least 100ms before submit");
+        AssertEqual(0, defaultConfig.GetChatCommandHotkeys().First().MinimumSubmitDelayMs, "Built-in exit command should not add a custom command delay");
+        AssertEqual(true, defaultConfig.ChatCommandHotkeys[0].Matches(KeyCode.VcF2, false, false, false), "Custom command hotkey should match its configured key");
+        AssertEqual(false, defaultConfig.ChatCommandHotkeys[0].Matches(KeyCode.VcF2, true, false, false), "Custom command hotkey should require exact modifiers");
+        AssertEqual(
+            "/remaining",
+            ChatCommandHotkey.FindMatching(defaultConfig.GetChatCommandHotkeys(), KeyCode.VcF3, false, false, false)?.Command,
+            "Configured chat command hotkeys should resolve matching custom commands");
+        AssertEqual(
+            100,
+            ChatCommandHotkey.FindMatching(defaultConfig.GetChatCommandHotkeys(), KeyCode.VcF3, false, false, false)?.MinimumSubmitDelayMs,
+            "Resolved custom command should carry the minimum submit delay");
+
+        var builtInChatMessage = new ChatCommandMessage("/exit");
+        AssertEqual(0, builtInChatMessage.MinimumSubmitDelayMs, "Built-in chat commands should keep the current submit timing");
+        var customChatMessage = new ChatCommandMessage("/hideout", defaultConfig.ChatCommandHotkeys[3].MinimumSubmitDelayMs);
+        AssertEqual(100, customChatMessage.MinimumSubmitDelayMs, "Custom chat command messages should carry the custom submit delay");
+
+        var blankCommand = new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF8), " ");
+        AssertEqual(false, blankCommand.Matches(KeyCode.VcF8, false, false, false), "Blank custom commands should not fire");
+
+        var disabledCustomCommands = ChatCommandHotkey.Normalize(
+            [
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF2), " "),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF3), "/remaining"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF4), "/deaths"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF5), "/hideout"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF6), "/leave"),
+            ]);
+        AssertEqual(" ", disabledCustomCommands[0].Command, "Disabled custom commands should stay blank after normalization");
+        AssertEqual(false, disabledCustomCommands[0].Matches(KeyCode.VcF2, false, false, false), "Disabled normalized custom commands should not fire");
+
+        var migratedCustomCommands = ChatCommandHotkey.Normalize(
+            [
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF5), "/hideout"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF3), "/remaining"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF4), "/leave"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF7), "/invite @last"),
+                new ChatCommandHotkey(new HotkeyCombo(KeyCode.VcF8), "/kick @last"),
+            ]);
+        AssertEqual(KeyCode.VcF2, migratedCustomCommands[0].Hotkey.Key, "Previous exact defaults should migrate first row to F2");
+        AssertEqual("/played", migratedCustomCommands[0].Command, "Previous exact defaults should migrate first row to played");
+        AssertEqual("/remaining", migratedCustomCommands[1].Command, "Previous exact defaults should keep remaining");
+        AssertEqual("/deaths", migratedCustomCommands[2].Command, "Previous exact defaults should migrate third row to deaths");
+        AssertEqual("/hideout", migratedCustomCommands[3].Command, "Previous exact defaults should migrate fourth row to hideout");
+        AssertEqual("/leave", migratedCustomCommands[4].Command, "Previous exact defaults should migrate fifth row to leave");
+
+        var configurationWindowXaml = File.ReadAllText("PoE-Kompanion/Views/ConfigurationWindow.axaml");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Width=\"400\""),
+            "Settings window should keep the original width");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Content=\"Custom Commands:\""),
+            "Settings should label the custom command section");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("ColumnDefinitions=\"200,150\""),
+            "Settings should put the custom command input field before the shortcut picker");
+        AssertEqual(
+            false,
+            configurationWindowXaml.Contains("Content=\"Command 1:\"") ||
+            configurationWindowXaml.Contains("Content=\"Command 2:\"") ||
+            configurationWindowXaml.Contains("Content=\"Command 3:\"") ||
+            configurationWindowXaml.Contains("Content=\"Command 4:\""),
+            "Settings should not show numbered custom command labels");
+        AssertEqual(
+            false,
+            configurationWindowXaml.Contains("Name=\"HideoutHotkeyPicker\"") ||
+            configurationWindowXaml.Contains("Content=\"Hideout:\""),
+            "Hideout should be configured through custom commands");
+        AssertEqual(
+            5,
+            CountOccurrences(configurationWindowXaml, "MinWidth=\"190\""),
+            "Settings should expose one command input field per custom command");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Watermark=\"/played\"") &&
+            configurationWindowXaml.Contains("Watermark=\"/deaths\"") &&
+            configurationWindowXaml.Contains("Watermark=\"/hideout\"") &&
+            configurationWindowXaml.Contains("Watermark=\"/leave\""),
+            "Settings should show the current default custom command placeholders");
+
+        var appXaml = File.ReadAllText("PoE-Kompanion/App.axaml");
+        AssertEqual(
+            true,
+            appXaml.Contains("<SimpleTheme />"),
+            "App should include a built-in theme so TextBox controls render");
+
+        var inputBlockerSource = File.ReadAllText("PoE-Kompanion/Views/InputBlockerOverlay.axaml.cs");
+        AssertEqual(
+            true,
+            inputBlockerSource.Contains("public bool PositionOverPoEWindow"),
+            "Input blocker positioning should report whether the overlay can be placed over PoE");
+        var configurationWindowSource = File.ReadAllText("PoE-Kompanion/Views/ConfigurationWindow.axaml.cs");
+        AssertEqual(
+            true,
+            configurationWindowSource.Contains("if (!overlay.PositionOverPoEWindow(poeProcessId.Value)) return;"),
+            "Settings should not show the input blocker overlay when PoE window bounds cannot be resolved");
+
         return 0;
+    }
+
+    private static int CountOccurrences(string value, string search)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = value.IndexOf(search, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += search.Length;
+        }
+
+        return count;
     }
 
     private static void AssertMatches(string processName, string commandLine, string message)

@@ -2,6 +2,7 @@ namespace PoEKompanion;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -151,8 +152,10 @@ internal sealed class VirtualKeyboard : IDisposable
         }
     }
 
-    public async Task SendChatCommandAsync(string command)
+    public async Task SendChatCommandAsync(string command, int minimumSubmitDelayMs = 0)
     {
+        if (string.IsNullOrWhiteSpace(command)) return;
+
         if (!this.IsInitialized)
         {
             Console.WriteLine("Virtual keyboard not available");
@@ -161,6 +164,8 @@ internal sealed class VirtualKeyboard : IDisposable
 
         try
         {
+            var startedAt = Stopwatch.StartNew();
+
             this.SendKey(KEY_ENTER, true);
             this.SendKey(KEY_ENTER, false);
 
@@ -173,6 +178,11 @@ internal sealed class VirtualKeyboard : IDisposable
             }
 
             await Task.Delay(1);
+            var remainingDelayMs = minimumSubmitDelayMs - (int)startedAt.ElapsedMilliseconds;
+            if (remainingDelayMs > 0)
+            {
+                await Task.Delay(remainingDelayMs);
+            }
 
             this.SendKey(KEY_ENTER, true);
             this.SendKey(KEY_ENTER, false);

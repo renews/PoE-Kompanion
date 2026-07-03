@@ -40,7 +40,7 @@ public class App : Application
     private bool isShiftPressed;
     private bool isAltPressed;
 
-    private HotkeyCombo? pendingHotkeyCombo;
+    private ChatCommandMessage? pendingChatCommand;
 
     public static App? Instance { get; private set; }
 
@@ -195,30 +195,12 @@ public class App : Application
                 // Fire immediately for settings (doesn't send text)
                 await this.OpenConfiguration();
             }
-            else if (this.config?.HideoutHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
+            else
             {
-                // Defer if hotkey has modifiers - fire on release
-                if (this.config.HideoutHotkey.Ctrl || this.config.HideoutHotkey.Shift || this.config.HideoutHotkey.Alt)
+                var chatCommandHotkey = this.FindMatchingChatCommandHotkey(keyCode);
+                if (chatCommandHotkey is not null)
                 {
-                    this.pendingHotkeyCombo = this.config.HideoutHotkey;
-                }
-                else
-                {
-                    if (this.ipc is null) return;
-                    await this.ipc.SendAsync(new ChatCommandMessage("/hideout"));
-                }
-            }
-            else if (this.config?.ExitHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
-            {
-                // Defer if hotkey has modifiers - fire on release
-                if (this.config.ExitHotkey.Ctrl || this.config.ExitHotkey.Shift || this.config.ExitHotkey.Alt)
-                {
-                    this.pendingHotkeyCombo = this.config.ExitHotkey;
-                }
-                else
-                {
-                    if (this.ipc is null) return;
-                    await this.ipc.SendAsync(new ChatCommandMessage("/exit"));
+                    await this.SendOrDeferChatCommand(chatCommandHotkey);
                 }
             }
         };
@@ -236,23 +218,13 @@ public class App : Application
                 if (this.isConfigWindowOpen) return;
 
                 // Check if all modifiers are now released and we have a pending hotkey
-                if (this.pendingHotkeyCombo is not null &&
+                if (this.pendingChatCommand is not null &&
                     !this.isCtrlPressed && !this.isShiftPressed && !this.isAltPressed)
                 {
-                    var combo = this.pendingHotkeyCombo;
-                    this.pendingHotkeyCombo = null;
+                    var command = this.pendingChatCommand;
+                    this.pendingChatCommand = null;
 
-                    // Fire the deferred action now that modifiers are released
-                    if (combo == this.config?.HideoutHotkey)
-                    {
-                        if (this.ipc is null) return;
-                        await this.ipc.SendAsync(new ChatCommandMessage("/hideout"));
-                    }
-                    else if (combo == this.config?.ExitHotkey)
-                    {
-                        if (this.ipc is null) return;
-                        await this.ipc.SendAsync(new ChatCommandMessage("/exit"));
-                    }
+                    await this.SendChatCommandAsync(command);
                 }
             }
         };
@@ -268,6 +240,38 @@ public class App : Application
                 Console.WriteLine($"Hook crashed: {ex.Message}");
             }
         });
+    }
+
+    private ChatCommandHotkey? FindMatchingChatCommandHotkey(SharpHook.Data.KeyCode keyCode) =>
+        this.config is null
+            ? null
+            : ChatCommandHotkey.FindMatching(
+                this.config.GetChatCommandHotkeys(),
+                keyCode,
+                this.isCtrlPressed,
+                this.isShiftPressed,
+                this.isAltPressed);
+
+    private async Task SendOrDeferChatCommand(ChatCommandHotkey chatCommandHotkey)
+    {
+        if (string.IsNullOrWhiteSpace(chatCommandHotkey.Command)) return;
+
+        var message = new ChatCommandMessage(chatCommandHotkey.Command, chatCommandHotkey.MinimumSubmitDelayMs);
+
+        if (chatCommandHotkey.Hotkey.HasModifiers())
+        {
+            this.pendingChatCommand = message;
+            return;
+        }
+
+        await this.SendChatCommandAsync(message);
+    }
+
+    private async Task SendChatCommandAsync(ChatCommandMessage command)
+    {
+        if (this.ipc is null) return;
+
+        await this.ipc.SendAsync(command);
     }
 
     public async Task StopMainHookAsync()

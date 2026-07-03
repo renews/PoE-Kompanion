@@ -94,6 +94,23 @@
         <Setter Property="BorderBrush" Value="{StaticResource PoEOrangeBrush}"/>
     </Style>
 
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{StaticResource PoEButtonPressedBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource PoETextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource PoEBorderLightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,5"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="TextBox:pointerover">
+        <Setter Property="BorderBrush" Value="{StaticResource PoEOrangeBrush}"/>
+    </Style>
+
+    <Style Selector="TextBox:focus">
+        <Setter Property="BorderBrush" Value="{StaticResource PoEOrangeLightBrush}"/>
+    </Style>
+
     <!-- PoE TextBlock Style -->
     <Style Selector="Label">
         <Setter Property="Foreground" Value="{StaticResource PoETextLabelColor}" />

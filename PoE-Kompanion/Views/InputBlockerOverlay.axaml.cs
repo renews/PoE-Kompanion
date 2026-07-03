@@ -33,13 +33,16 @@ public partial class InputBlockerOverlay : Window
         e.Handled = true;
     }
 
-    public void PositionOverPoEWindow(int poeProcessId)
+    public bool PositionOverPoEWindow(int poeProcessId)
     {
         var bounds = WindowManager.GetWindowBounds(poeProcessId);
-        if (bounds is null) return;
+        if (bounds is null || bounds.Value.Width <= 0 || bounds.Value.Height <= 0) return false;
 
-        this.Position = new Avalonia.PixelPoint(bounds.Value.X, bounds.Value.Y);
-        this.Width = bounds.Value.Width;
-        this.Height = bounds.Value.Height;
+        var value = bounds.Value;
+        this.Position = new Avalonia.PixelPoint(value.X, value.Y);
+        this.Width = value.Width;
+        this.Height = value.Height;
+
+        return true;
     }
 }
