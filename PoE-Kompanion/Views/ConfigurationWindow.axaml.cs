@@ -63,6 +63,48 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
         }
     }
 
+    public HotkeyCombo? AutoWeaponSwapKey
+    {
+        get => this.currentConfig.AutoWeaponSwap.Key;
+        set
+        {
+            var nextKey = value ?? AutoWeaponSwapSettings.GetDefault().Key;
+            if (this.currentConfig.AutoWeaponSwap.Key == nextKey) return;
+
+            this.currentConfig.AutoWeaponSwap.Key = nextKey;
+            this.OnPropertyChanged();
+        }
+    }
+
+    public HotkeyCombo? AutoWeaponSwapToggleHotkey
+    {
+        get => this.currentConfig.AutoWeaponSwap.ToggleHotkey;
+        set
+        {
+            var nextHotkey = value ?? AutoWeaponSwapSettings.GetDefault().ToggleHotkey;
+            if (this.currentConfig.AutoWeaponSwap.ToggleHotkey == nextHotkey) return;
+
+            this.currentConfig.AutoWeaponSwap.ToggleHotkey = nextHotkey;
+            this.OnPropertyChanged();
+        }
+    }
+
+    public double AutoWeaponSwapIntervalMs
+    {
+        get => this.currentConfig.AutoWeaponSwap.IntervalMs;
+        set
+        {
+            var nextIntervalMs = AutoWeaponSwapSettings.ClampInterval((int)Math.Round(value));
+            if (this.currentConfig.AutoWeaponSwap.IntervalMs == nextIntervalMs) return;
+
+            this.currentConfig.AutoWeaponSwap.IntervalMs = nextIntervalMs;
+            this.OnPropertyChanged();
+            this.OnPropertyChanged(nameof(this.AutoWeaponSwapIntervalLabel));
+        }
+    }
+
+    public string AutoWeaponSwapIntervalLabel => $"{this.currentConfig.AutoWeaponSwap.IntervalMs} ms";
+
     public HotkeyCombo? ChatCommand1Hotkey
     {
         get => this.GetChatCommandHotkey(0);
@@ -231,6 +273,10 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
         this.OnPropertyChanged(nameof(this.OpenSettingsHotkey));
         this.OnPropertyChanged(nameof(this.HideoutHotkey));
         this.OnPropertyChanged(nameof(this.ExitHotkey));
+        this.OnPropertyChanged(nameof(this.AutoWeaponSwapKey));
+        this.OnPropertyChanged(nameof(this.AutoWeaponSwapToggleHotkey));
+        this.OnPropertyChanged(nameof(this.AutoWeaponSwapIntervalMs));
+        this.OnPropertyChanged(nameof(this.AutoWeaponSwapIntervalLabel));
         this.OnPropertyChanged(nameof(this.ChatCommand1Hotkey));
         this.OnPropertyChanged(nameof(this.ChatCommand1Command));
         this.OnPropertyChanged(nameof(this.ChatCommand2Hotkey));
@@ -247,6 +293,7 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
     {
         try
         {
+            this.currentConfig.AutoWeaponSwap = AutoWeaponSwapSettings.Normalize(this.currentConfig.AutoWeaponSwap);
             await ConfigurationManager.SaveAsync(this.currentConfig);
             this.Close();
         }

@@ -13,7 +13,7 @@ internal static class Program
     private static int Main()
     {
         AssertEqual(
-            "1.0.0",
+            "1.1.0",
             typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             "Assembly informational version should match release version");
 
@@ -145,6 +145,58 @@ internal static class Program
             ChatCommandHotkey.FindMatching(defaultConfig.GetChatCommandHotkeys(), KeyCode.VcF3, false, false, false)?.MinimumSubmitDelayMs,
             "Resolved custom command should carry the minimum submit delay");
 
+        AssertEqual(false, defaultConfig.AutoWeaponSwap.Enabled, "Auto weapon swap should default disabled");
+        AssertEqual(KeyCode.VcX, defaultConfig.AutoWeaponSwap.Key.Key, "Auto weapon swap should default to X");
+        AssertEqual(KeyCode.VcF7, defaultConfig.AutoWeaponSwap.ToggleHotkey.Key, "Auto weapon swap toggle should default to F7");
+        AssertEqual(400, defaultConfig.AutoWeaponSwap.IntervalMs, "Auto weapon swap should default to 400ms");
+
+        var shortAutoWeaponSwap = AutoWeaponSwapSettings.Normalize(
+            new AutoWeaponSwapSettings(true, null, 50));
+        AssertEqual(true, shortAutoWeaponSwap.Enabled, "Auto weapon swap normalization should keep enabled state");
+        AssertEqual(KeyCode.VcX, shortAutoWeaponSwap.Key.Key, "Auto weapon swap normalization should restore a missing key");
+        AssertEqual(KeyCode.VcF7, shortAutoWeaponSwap.ToggleHotkey.Key, "Auto weapon swap normalization should restore a missing toggle hotkey");
+        AssertEqual(300, shortAutoWeaponSwap.IntervalMs, "Auto weapon swap normalization should clamp the minimum interval");
+
+        var longAutoWeaponSwap = AutoWeaponSwapSettings.Normalize(
+            new AutoWeaponSwapSettings(true, new HotkeyCombo(KeyCode.VcW), new HotkeyCombo(KeyCode.VcF8), 1200));
+        AssertEqual(KeyCode.VcW, longAutoWeaponSwap.Key.Key, "Auto weapon swap normalization should keep configured key");
+        AssertEqual(KeyCode.VcF8, longAutoWeaponSwap.ToggleHotkey.Key, "Auto weapon swap normalization should keep configured toggle hotkey");
+        AssertEqual(1000, longAutoWeaponSwap.IntervalMs, "Auto weapon swap normalization should clamp the maximum interval");
+        longAutoWeaponSwap.ToggleEnabled();
+        AssertEqual(false, longAutoWeaponSwap.Enabled, "Auto weapon swap toggle should turn enabled off");
+        longAutoWeaponSwap.ToggleEnabled();
+        AssertEqual(true, longAutoWeaponSwap.Enabled, "Auto weapon swap toggle should turn enabled on");
+
+        var minimumMsRange = AutoWeaponSwapSettings.GetDelayRange(100);
+        AssertEqual(270, minimumMsRange.MinMs, "Auto weapon swap should clamp low base intervals before subtracting 10 percent");
+        AssertEqual(330, minimumMsRange.MaxMs, "Auto weapon swap should clamp low base intervals before adding 10 percent");
+
+        var defaultMsRange = AutoWeaponSwapSettings.GetDelayRange(400);
+        AssertEqual(360, defaultMsRange.MinMs, "Auto weapon swap default jitter should start at 360ms");
+        AssertEqual(440, defaultMsRange.MaxMs, "Auto weapon swap default jitter should end at 440ms");
+
+        var random = new Random(1234);
+        for (var i = 0; i < 100; i++)
+        {
+            var delayMs = AutoWeaponSwapSettings.CreateDelayMs(400, random);
+            AssertEqual(true, delayMs >= 360 && delayMs <= 440, "Auto weapon swap random delay should stay within 10 percent");
+        }
+
+        AssertEqual(true, LinuxKeyCodeMapper.TryMap(KeyCode.VcX, out var linuxXKeyCode), "Auto weapon swap should map the default X key");
+        AssertEqual(45, linuxXKeyCode, "X should map to Linux KEY_X");
+        AssertEqual(true, LinuxKeyCodeMapper.TryMap(KeyCode.VcF1, out var linuxF1KeyCode), "Auto weapon swap should map function keys");
+        AssertEqual(59, linuxF1KeyCode, "F1 should map to Linux KEY_F1");
+        AssertEqual(true, LinuxKeyCodeMapper.TryMap(KeyCode.VcSpace, out var linuxSpaceKeyCode), "Auto weapon swap should map space");
+        AssertEqual(57, linuxSpaceKeyCode, "Space should map to Linux KEY_SPACE");
+        AssertEqual(true, WindowManager.IsActiveWindowProcess(1234, "1234\n"), "Active window should match the same process id");
+        AssertEqual(false, WindowManager.IsActiveWindowProcess(1234, "4321\n"), "Active window should reject another process id");
+        AssertEqual(false, WindowManager.IsActiveWindowProcess(1234, string.Empty), "Active window should reject missing process id output");
+
+        var autoWeaponSwapMessage = new AutoWeaponSwapConfigMessage(true, KeyCode.VcX, 200);
+        AssertEqual(true, autoWeaponSwapMessage.Enabled, "Auto weapon swap IPC message should carry enabled state");
+        AssertEqual(KeyCode.VcX, autoWeaponSwapMessage.KeyCode, "Auto weapon swap IPC message should carry the configured key");
+        AssertEqual(200, autoWeaponSwapMessage.BaseIntervalMs, "Auto weapon swap IPC message should carry the base interval");
+
         var builtInChatMessage = new ChatCommandMessage("/exit");
         AssertEqual(0, builtInChatMessage.MinimumSubmitDelayMs, "Built-in chat commands should keep the current submit timing");
         var customChatMessage = new ChatCommandMessage("/hideout", defaultConfig.ChatCommandHotkeys[3].MinimumSubmitDelayMs);
@@ -215,12 +267,46 @@ internal static class Program
             configurationWindowXaml.Contains("Watermark=\"/hideout\"") &&
             configurationWindowXaml.Contains("Watermark=\"/leave\""),
             "Settings should show the current default custom command placeholders");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Content=\"Auto Weapon Swap:\""),
+            "Settings should expose the auto weapon swap section");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Name=\"AutoWeaponSwapKeyPicker\""),
+            "Settings should expose the auto weapon swap key picker");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("Name=\"AutoWeaponSwapToggleHotkeyPicker\""),
+            "Settings should expose the auto weapon swap toggle key picker");
+        AssertEqual(
+            false,
+            configurationWindowXaml.Contains("<CheckBox") ||
+            configurationWindowXaml.Contains("Content=\"Enabled\"") ||
+            configurationWindowXaml.Contains("AutoWeaponSwapEnabled"),
+            "Settings should not show an auto weapon swap checkbox when a toggle hotkey exists");
+        AssertEqual(
+            true,
+            configurationWindowXaml.Contains("<Slider") &&
+            configurationWindowXaml.Contains("Minimum=\"300\"") &&
+            configurationWindowXaml.Contains("Maximum=\"1000\""),
+            "Settings should expose a 300ms to 1000ms auto weapon swap interval slider");
 
         var appXaml = File.ReadAllText("PoE-Kompanion/App.axaml");
         AssertEqual(
             true,
             appXaml.Contains("<SimpleTheme />"),
             "App should include a built-in theme so TextBox controls render");
+
+        var themeXaml = File.ReadAllText("PoE-Kompanion/Styles/PoETheme.axaml");
+        AssertEqual(
+            false,
+            themeXaml.Contains("Style Selector=\"CheckBox\""),
+            "Settings should not carry a checkbox style when no checkbox is shown");
+        AssertEqual(
+            true,
+            themeXaml.Contains("Style Selector=\"Slider\""),
+            "Settings should style the auto weapon swap range selector");
 
         var inputBlockerSource = File.ReadAllText("PoE-Kompanion/Views/InputBlockerOverlay.axaml.cs");
         AssertEqual(
@@ -232,6 +318,22 @@ internal static class Program
             true,
             configurationWindowSource.Contains("if (!overlay.PositionOverPoEWindow(poeProcessId.Value)) return;"),
             "Settings should not show the input blocker overlay when PoE window bounds cannot be resolved");
+        AssertEqual(
+            false,
+            configurationWindowSource.Contains("AutoWeaponSwapEnabled"),
+            "Settings code-behind should not expose an unused auto weapon swap checkbox binding");
+
+        var appSource = File.ReadAllText("PoE-Kompanion/App.axaml.cs");
+        AssertEqual(
+            true,
+            appSource.Contains("ToggleAutoWeaponSwapAsync"),
+            "App should expose auto weapon swap toggle hotkey handling");
+
+        var poeTrackerSource = File.ReadAllText("PoE-Kompanion/PoETracker.cs");
+        AssertEqual(
+            true,
+            poeTrackerSource.Contains("WindowManager.IsActiveWindowProcess(this.poeProcess.Id)"),
+            "Auto weapon swap should only press while the active window belongs to PoE");
 
         return 0;
     }

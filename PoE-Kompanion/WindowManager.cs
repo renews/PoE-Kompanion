@@ -62,6 +62,24 @@ public static class WindowManager
         }
     }
 
+    public static bool IsActiveWindowProcess(int processId)
+    {
+        if (!OperatingSystem.IsLinux()) return false;
+
+        try
+        {
+            return IsActiveWindowProcess(processId, GetActiveWindowProcessIdOutput());
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public static bool IsActiveWindowProcess(int processId, string? activeWindowProcessIdOutput) =>
+        int.TryParse(activeWindowProcessIdOutput?.Trim(), out var activeProcessId) &&
+        activeProcessId == processId;
+
     public static void SetWindowSkipTaskbar(int processId, string windowTitle)
     {
         if (!OperatingSystem.IsLinux()) return;
@@ -110,6 +128,28 @@ public static class WindowManager
         {
             // Ignore
         }
+    }
+
+    private static string? GetActiveWindowProcessIdOutput()
+    {
+        var proc = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "xdotool",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            },
+        };
+        proc.StartInfo.ArgumentList.Add("getactivewindow");
+        proc.StartInfo.ArgumentList.Add("getwindowpid");
+
+        proc.Start();
+        var output = proc.StandardOutput.ReadToEnd();
+        proc.WaitForExit(5000);
+
+        return proc.ExitCode == 0 ? output : null;
     }
 
     private static bool TryWithWmctrl(int processId)

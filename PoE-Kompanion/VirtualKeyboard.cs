@@ -193,6 +193,25 @@ internal sealed class VirtualKeyboard : IDisposable
         }
     }
 
+    public void SendKeyPress(int keyCode)
+    {
+        if (!this.IsInitialized)
+        {
+            Console.WriteLine("Virtual keyboard not available");
+            return;
+        }
+
+        try
+        {
+            this.SendKey(keyCode, true);
+            this.SendKey(keyCode, false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending key press: {ex.Message}");
+        }
+    }
+
     private void SendKey(int keyCode, bool press)
     {
         var evt = new InputEvent

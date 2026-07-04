@@ -3,6 +3,7 @@ namespace PoEKompanion;
 using System.Collections.Generic;
 
 using MessagePack;
+using SharpHook.Data;
 
 [MessagePackObject]
 [Union(0, typeof(ForceLogoutMessage))]
@@ -14,6 +15,7 @@ using MessagePack;
 [Union(6, typeof(KeyboardLayoutMapMessage))]
 [Union(7, typeof(BackgroundReadyMessage))]
 [Union(8, typeof(ModifierStateMessage))]
+[Union(9, typeof(AutoWeaponSwapConfigMessage))]
 public abstract record IpcMessage;
 
 [MessagePackObject]
@@ -70,4 +72,11 @@ public sealed record BackgroundReadyMessage : IpcMessage;
 [MessagePackObject]
 public sealed record ModifierStateMessage(
     [property: Key(0)] bool AllModifiersReleased
+) : IpcMessage;
+
+[MessagePackObject]
+public sealed record AutoWeaponSwapConfigMessage(
+    [property: Key(0)] bool Enabled,
+    [property: Key(1)] KeyCode KeyCode,
+    [property: Key(2)] int BaseIntervalMs
 ) : IpcMessage;

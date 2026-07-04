@@ -16,6 +16,7 @@ public class ConfigurationModel
     public HotkeyCombo HideoutHotkey { get; set; } = new(KeyCode.VcF5);
     public HotkeyCombo ExitHotkey { get; set; } = new(KeyCode.VcSpace, ctrl: true, shift: true);
     public ChatCommandHotkey[] ChatCommandHotkeys { get; set; } = ChatCommandHotkey.GetDefaults();
+    public AutoWeaponSwapSettings AutoWeaponSwap { get; set; } = AutoWeaponSwapSettings.GetDefault();
 
     public IEnumerable<ChatCommandHotkey> GetChatCommandHotkeys()
     {
@@ -25,6 +26,82 @@ public class ConfigurationModel
         {
             yield return chatCommandHotkey;
         }
+    }
+}
+
+public sealed class AutoWeaponSwapSettings
+{
+    public const int MIN_INTERVAL_MS = 300;
+    public const int MAX_INTERVAL_MS = 1000;
+    public const int DEFAULT_INTERVAL_MS = 400;
+
+    private const double INTERVAL_VARIATION = 0.10;
+
+    public bool Enabled { get; set; }
+    public HotkeyCombo Key { get; set; }
+    public HotkeyCombo ToggleHotkey { get; set; }
+    public int IntervalMs { get; set; }
+
+    [JsonConstructor]
+    public AutoWeaponSwapSettings(
+        bool enabled = false,
+        HotkeyCombo? key = null,
+        HotkeyCombo? toggleHotkey = null,
+        int intervalMs = DEFAULT_INTERVAL_MS)
+    {
+        this.Enabled = enabled;
+        this.Key = key ?? new HotkeyCombo(KeyCode.VcX);
+        this.ToggleHotkey = toggleHotkey ?? new HotkeyCombo(KeyCode.VcF7);
+        this.IntervalMs = ClampInterval(intervalMs);
+    }
+
+    public AutoWeaponSwapSettings(bool enabled, HotkeyCombo? key, int intervalMs)
+        : this(enabled, key, null, intervalMs)
+    {
+    }
+
+    public static AutoWeaponSwapSettings GetDefault() => new();
+
+    public static AutoWeaponSwapSettings Normalize(AutoWeaponSwapSettings? settings)
+    {
+        if (settings is null) return GetDefault();
+
+        settings.Key ??= new HotkeyCombo(KeyCode.VcX);
+        if (!Enum.IsDefined(typeof(KeyCode), settings.Key.Key))
+        {
+            settings.Key = new HotkeyCombo(KeyCode.VcX);
+        }
+
+        settings.ToggleHotkey ??= new HotkeyCombo(KeyCode.VcF7);
+        if (!Enum.IsDefined(typeof(KeyCode), settings.ToggleHotkey.Key))
+        {
+            settings.ToggleHotkey = new HotkeyCombo(KeyCode.VcF7);
+        }
+
+        settings.IntervalMs = ClampInterval(settings.IntervalMs);
+        return settings;
+    }
+
+    public void ToggleEnabled()
+    {
+        this.Enabled = !this.Enabled;
+    }
+
+    public static int ClampInterval(int intervalMs) =>
+        Math.Clamp(intervalMs, MIN_INTERVAL_MS, MAX_INTERVAL_MS);
+
+    public static (int MinMs, int MaxMs) GetDelayRange(int baseIntervalMs)
+    {
+        var intervalMs = ClampInterval(baseIntervalMs);
+        var variationMs = (int)Math.Round(intervalMs * INTERVAL_VARIATION);
+
+        return (intervalMs - variationMs, intervalMs + variationMs);
+    }
+
+    public static int CreateDelayMs(int baseIntervalMs, Random random)
+    {
+        var range = GetDelayRange(baseIntervalMs);
+        return random.Next(range.MinMs, range.MaxMs + 1);
     }
 }
 
@@ -147,6 +224,7 @@ public sealed class ChatCommandHotkey
 [JsonSerializable(typeof(ConfigurationModel))]
 [JsonSerializable(typeof(HotkeyCombo))]
 [JsonSerializable(typeof(ChatCommandHotkey))]
+[JsonSerializable(typeof(AutoWeaponSwapSettings))]
 [JsonSourceGenerationOptions(WriteIndented = true)]
 internal partial class ConfigJsonContext : JsonSerializerContext
 {
@@ -202,6 +280,7 @@ public static class ConfigurationManager
             }
 
             config.ChatCommandHotkeys = ChatCommandHotkey.Normalize(config.ChatCommandHotkeys, config.HideoutHotkey);
+            config.AutoWeaponSwap = AutoWeaponSwapSettings.Normalize(config.AutoWeaponSwap);
 
             return config;
         }

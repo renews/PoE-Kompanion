@@ -111,6 +111,11 @@
         <Setter Property="BorderBrush" Value="{StaticResource PoEOrangeLightBrush}"/>
     </Style>
 
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <!-- PoE TextBlock Style -->
     <Style Selector="Label">
         <Setter Property="Foreground" Value="{StaticResource PoETextLabelColor}" />

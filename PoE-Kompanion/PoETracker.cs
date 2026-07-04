@@ -20,6 +20,7 @@ internal sealed class PoETracker
     private readonly List<OpenedPoEConnection> openedPoEConnections = [];
     private UnixSocketIpc? ipc;
     private readonly VirtualKeyboard virtualKeyboard = new();
+    private CancellationTokenSource? autoWeaponSwapCancellation;
 
     private PoETracker()
     {
@@ -83,8 +84,56 @@ internal sealed class PoETracker
             {
                 this.virtualKeyboard.SetLayoutMap(layoutMapMessage.LayoutMap);
             }
+            else if (message is AutoWeaponSwapConfigMessage autoWeaponSwapConfig)
+            {
+                this.ConfigureAutoWeaponSwap(autoWeaponSwapConfig);
+            }
         }
         // ReSharper disable once FunctionNeverReturns
+    }
+
+    private void ConfigureAutoWeaponSwap(AutoWeaponSwapConfigMessage config)
+    {
+        this.autoWeaponSwapCancellation?.Cancel();
+        this.autoWeaponSwapCancellation?.Dispose();
+        this.autoWeaponSwapCancellation = null;
+
+        if (!config.Enabled) return;
+
+        if (!LinuxKeyCodeMapper.TryMap(config.KeyCode, out var linuxKeyCode))
+        {
+            Console.WriteLine($"Auto weapon swap key is not supported: {config.KeyCode}");
+            return;
+        }
+
+        var baseIntervalMs = AutoWeaponSwapSettings.ClampInterval(config.BaseIntervalMs);
+        this.autoWeaponSwapCancellation = new CancellationTokenSource();
+        var token = this.autoWeaponSwapCancellation.Token;
+
+        _ = Task.Run(() => this.RunAutoWeaponSwapAsync(linuxKeyCode, baseIntervalMs, token), token);
+    }
+
+    private async Task RunAutoWeaponSwapAsync(int linuxKeyCode, int baseIntervalMs, CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                var delayMs = AutoWeaponSwapSettings.CreateDelayMs(baseIntervalMs, Random.Shared);
+                await Task.Delay(delayMs, token);
+                if (this.poeProcess is null || !WindowManager.IsActiveWindowProcess(this.poeProcess.Id)) continue;
+
+                this.virtualKeyboard.SendKeyPress(linuxKeyCode);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when settings change or auto weapon swap is disabled.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Expected if settings are replaced while the previous delay is being cancelled.
+        }
     }
 
     private void FindPoEExecutable()

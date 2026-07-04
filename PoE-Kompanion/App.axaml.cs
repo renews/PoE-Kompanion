@@ -140,6 +140,7 @@ public class App : Application
             else if (message is BackgroundReadyMessage)
             {
                 await this.SendKeyboardLayoutMapAsync();
+                await this.SendAutoWeaponSwapConfigAsync();
             }
         }
     }
@@ -159,6 +160,27 @@ public class App : Application
         catch (Exception ex)
         {
             Console.WriteLine($"ERROR sending layout map: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task SendAutoWeaponSwapConfigAsync()
+    {
+        try
+        {
+            if (this.ipc is null || this.config is null) return;
+
+            var autoWeaponSwap = this.config.AutoWeaponSwap;
+            var message = new AutoWeaponSwapConfigMessage(
+                autoWeaponSwap.Enabled,
+                autoWeaponSwap.Key.Key,
+                autoWeaponSwap.IntervalMs);
+
+            await this.ipc.SendAsync(message);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR sending auto weapon swap config: {ex.GetType().Name}: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
     }
@@ -194,6 +216,10 @@ public class App : Application
             {
                 // Fire immediately for settings (doesn't send text)
                 await this.OpenConfiguration();
+            }
+            else if (this.config?.AutoWeaponSwap?.ToggleHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
+            {
+                await this.ToggleAutoWeaponSwapAsync();
             }
             else
             {
@@ -272,6 +298,27 @@ public class App : Application
         if (this.ipc is null) return;
 
         await this.ipc.SendAsync(command);
+    }
+
+    private async Task ToggleAutoWeaponSwapAsync()
+    {
+        if (this.config is null) return;
+
+        try
+        {
+            this.config.AutoWeaponSwap.ToggleEnabled();
+            await ConfigurationManager.SaveAsync(this.config);
+            await this.SendAutoWeaponSwapConfigAsync();
+
+            NotificationManager.SendInfo(this.config.AutoWeaponSwap.Enabled
+                ? "Auto weapon swap enabled"
+                : "Auto weapon swap disabled");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling auto weapon swap: {ex.Message}");
+            NotificationManager.SendError("Error toggling auto weapon swap");
+        }
     }
 
     public async Task StopMainHookAsync()
@@ -387,6 +434,7 @@ public class App : Application
                 this.configWindow = null;
                 this.isConfigWindowOpen = false;
                 this.config = await ConfigurationManager.LoadAsync();
+                await this.SendAutoWeaponSwapConfigAsync();
                 this.StartMainHook();
             };
             this.configWindow.Show();
