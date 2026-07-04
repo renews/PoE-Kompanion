@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
+using MessagePack;
 using PoEKompanion;
 using SharpHook.Data;
 
@@ -13,7 +14,7 @@ internal static class Program
     private static int Main()
     {
         AssertEqual(
-            "1.1.0",
+            "1.1.1",
             typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             "Assembly informational version should match release version");
 
@@ -191,11 +192,52 @@ internal static class Program
         AssertEqual(true, WindowManager.IsActiveWindowProcess(1234, "1234\n"), "Active window should match the same process id");
         AssertEqual(false, WindowManager.IsActiveWindowProcess(1234, "4321\n"), "Active window should reject another process id");
         AssertEqual(false, WindowManager.IsActiveWindowProcess(1234, string.Empty), "Active window should reject missing process id output");
+        AssertEqual(
+            true,
+            WindowManager.IsActiveWindowProcess(
+                2665,
+                "{\"id\":10,\"title\":\"Amazon - Zen Browser\",\"app_id\":\"zen\",\"pid\":2665,\"is_focused\":true}"),
+            "Active window should match Niri focused-window JSON");
+        AssertEqual(
+            false,
+            WindowManager.IsActiveWindowProcess(
+                1234,
+                "{\"id\":10,\"title\":\"Amazon - Zen Browser\",\"app_id\":\"zen\",\"pid\":2665,\"is_focused\":true}"),
+            "Active window should reject Niri focused-window JSON for another process");
+        AssertEqual(
+            true,
+            WindowManager.IsActiveWindowProcess(
+                75186,
+                "{\"id\":12,\"title\":\"Path of Exile 2\",\"app_id\":\"steam_app_2694490\",\"pid\":1896,\"is_focused\":true}"),
+            "Active window should match Niri Xwayland proxy windows for Path of Exile 2");
+        AssertEqual(
+            false,
+            WindowManager.IsActiveWindowProcess(
+                75186,
+                "{\"id\":10,\"title\":\"Path of Exile 2 guide - Zen Browser\",\"app_id\":\"zen\",\"pid\":2665,\"is_focused\":true}"),
+            "Active window should reject browser windows with Path of Exile in the title");
+        AssertEqual(
+            true,
+            WindowManager.IsActiveWindowProcess(
+                2665,
+                "{\"nodes\":[{\"nodes\":[{\"focused\":true,\"pid\":2665}]}]}"),
+            "Active window should match Sway focused tree JSON");
+        AssertEqual(
+            false,
+            WindowManager.IsActiveWindowProcess(
+                1234,
+                "{\"nodes\":[{\"nodes\":[{\"focused\":true,\"pid\":2665}]}]}"),
+            "Active window should reject Sway focused tree JSON for another process");
 
-        var autoWeaponSwapMessage = new AutoWeaponSwapConfigMessage(true, KeyCode.VcX, 200);
+        var autoWeaponSwapMessage = new AutoWeaponSwapConfigMessage(true, (int)KeyCode.VcX, 200);
         AssertEqual(true, autoWeaponSwapMessage.Enabled, "Auto weapon swap IPC message should carry enabled state");
-        AssertEqual(KeyCode.VcX, autoWeaponSwapMessage.KeyCode, "Auto weapon swap IPC message should carry the configured key");
+        AssertEqual(typeof(int), ((object)autoWeaponSwapMessage.KeyCode).GetType(), "Auto weapon swap IPC key should be encoded as an AOT-safe primitive");
+        AssertEqual((int)KeyCode.VcX, Convert.ToInt32(autoWeaponSwapMessage.KeyCode), "Auto weapon swap IPC message should carry the configured key");
         AssertEqual(200, autoWeaponSwapMessage.BaseIntervalMs, "Auto weapon swap IPC message should carry the base interval");
+        AssertEqual(
+            autoWeaponSwapMessage,
+            MessagePackSerializer.Deserialize<IpcMessage>(MessagePackSerializer.Serialize<IpcMessage>(autoWeaponSwapMessage)),
+            "Auto weapon swap IPC message should serialize through the IpcMessage union");
 
         var builtInChatMessage = new ChatCommandMessage("/exit");
         AssertEqual(0, builtInChatMessage.MinimumSubmitDelayMs, "Built-in chat commands should keep the current submit timing");
@@ -334,6 +376,17 @@ internal static class Program
             true,
             poeTrackerSource.Contains("WindowManager.IsActiveWindowProcess(this.poeProcess.Id)"),
             "Auto weapon swap should only press while the active window belongs to PoE");
+        var windowManagerSource = File.ReadAllText("PoE-Kompanion/WindowManager.cs");
+        AssertEqual(
+            true,
+            windowManagerSource.Contains("hyprctl") &&
+            windowManagerSource.Contains("activewindow"),
+            "Active window detection should support Hyprland focused-window lookup");
+        AssertEqual(
+            true,
+            windowManagerSource.Contains("swaymsg") &&
+            windowManagerSource.Contains("get_tree"),
+            "Active window detection should support Sway focused-window lookup");
 
         return 0;
     }

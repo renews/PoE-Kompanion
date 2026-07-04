@@ -5,6 +5,13 @@ All notable changes to PoE Kompanion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-07-04
+
+### Fixed
+- Auto weapon swap configuration now serializes correctly in NativeAOT release builds.
+- Auto weapon swap focus detection now supports Niri, Hyprland, and Sway compositor APIs before falling back to X11.
+- Path of Exile 2 Xwayland proxy windows on Niri are now recognized as the active game window.
+
 ## [1.1.0] - 2026-07-04
 
 ### Added
@@ -92,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unix domain socket IPC for process communication
 - Background process runs with CAP_NET_ADMIN capability for network operations
 
+[1.1.1]: https://github.com/renews/PoE-Kompanion/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/renews/PoE-Kompanion/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.2.2...v1.0.0
 [0.2.2]: https://github.com/Samuel-B-D/PoE-Kompanion/compare/v0.2.1...v0.2.2

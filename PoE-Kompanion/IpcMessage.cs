@@ -3,7 +3,6 @@ namespace PoEKompanion;
 using System.Collections.Generic;
 
 using MessagePack;
-using SharpHook.Data;
 
 [MessagePackObject]
 [Union(0, typeof(ForceLogoutMessage))]
@@ -77,6 +76,6 @@ public sealed record ModifierStateMessage(
 [MessagePackObject]
 public sealed record AutoWeaponSwapConfigMessage(
     [property: Key(0)] bool Enabled,
-    [property: Key(1)] KeyCode KeyCode,
+    [property: Key(1)] int KeyCode,
     [property: Key(2)] int BaseIntervalMs
 ) : IpcMessage;

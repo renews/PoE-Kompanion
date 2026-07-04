@@ -9,6 +9,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
+using SharpHook.Data;
+
 internal sealed class PoETracker
 {
     public static readonly PoETracker Instance = new();
@@ -100,9 +102,10 @@ internal sealed class PoETracker
 
         if (!config.Enabled) return;
 
-        if (!LinuxKeyCodeMapper.TryMap(config.KeyCode, out var linuxKeyCode))
+        var keyCode = (KeyCode)config.KeyCode;
+        if (!LinuxKeyCodeMapper.TryMap(keyCode, out var linuxKeyCode))
         {
-            Console.WriteLine($"Auto weapon swap key is not supported: {config.KeyCode}");
+            Console.WriteLine($"Auto weapon swap key is not supported: {keyCode}");
             return;
         }
 

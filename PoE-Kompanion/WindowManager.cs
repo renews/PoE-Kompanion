@@ -1,7 +1,9 @@
 namespace PoEKompanion;
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 public static class WindowManager
@@ -68,7 +70,10 @@ public static class WindowManager
 
         try
         {
-            return IsActiveWindowProcess(processId, GetActiveWindowProcessIdOutput());
+            var compositorFocusedWindowOutput = GetCompositorFocusedWindowOutput();
+            return !string.IsNullOrWhiteSpace(compositorFocusedWindowOutput)
+                ? IsActiveWindowProcess(processId, compositorFocusedWindowOutput)
+                : IsActiveWindowProcess(processId, GetActiveWindowProcessIdOutput());
         }
         catch (Exception)
         {
@@ -77,8 +82,8 @@ public static class WindowManager
     }
 
     public static bool IsActiveWindowProcess(int processId, string? activeWindowProcessIdOutput) =>
-        int.TryParse(activeWindowProcessIdOutput?.Trim(), out var activeProcessId) &&
-        activeProcessId == processId;
+        TryParseActiveWindowProcessId(activeWindowProcessIdOutput, out var activeProcessId) && activeProcessId == processId ||
+        IsPathOfExileWindow(activeWindowProcessIdOutput);
 
     public static void SetWindowSkipTaskbar(int processId, string windowTitle)
     {
@@ -130,26 +135,255 @@ public static class WindowManager
         }
     }
 
-    private static string? GetActiveWindowProcessIdOutput()
+    private static string? GetActiveWindowProcessIdOutput() =>
+        RunCommand("xdotool", "getactivewindow", "getwindowpid");
+
+    private static string? GetCompositorFocusedWindowOutput()
     {
-        var proc = new Process
+        foreach (var provider in GetFocusedWindowProviderNames())
         {
-            StartInfo = new ProcessStartInfo
+            var output = provider switch
             {
-                FileName = "xdotool",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true,
-            },
-        };
-        proc.StartInfo.ArgumentList.Add("getactivewindow");
-        proc.StartInfo.ArgumentList.Add("getwindowpid");
+                "niri" => GetNiriFocusedWindowOutput(),
+                "hyprland" => GetHyprlandFocusedWindowOutput(),
+                "sway" => GetSwayFocusedWindowOutput(),
+                _ => null,
+            };
 
-        proc.Start();
-        var output = proc.StandardOutput.ReadToEnd();
-        proc.WaitForExit(5000);
+            if (!string.IsNullOrWhiteSpace(output)) return output;
+        }
 
-        return proc.ExitCode == 0 ? output : null;
+        return null;
+    }
+
+    private static IEnumerable<string> GetFocusedWindowProviderNames()
+    {
+        var providers = new List<string>();
+
+        if (IsDesktopSession("niri") || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NIRI_SOCKET")))
+        {
+            AddProvider(providers, "niri");
+        }
+
+        if (IsDesktopSession("hyprland") || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE")))
+        {
+            AddProvider(providers, "hyprland");
+        }
+
+        if (IsDesktopSession("sway") || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SWAYSOCK")))
+        {
+            AddProvider(providers, "sway");
+        }
+
+        AddProvider(providers, "niri");
+        AddProvider(providers, "hyprland");
+        AddProvider(providers, "sway");
+
+        return providers;
+    }
+
+    private static string? GetNiriFocusedWindowOutput() =>
+        RunCommand("niri", "msg", "--json", "focused-window");
+
+    private static string? GetHyprlandFocusedWindowOutput() =>
+        RunCommand("hyprctl", "-j", "activewindow");
+
+    private static string? GetSwayFocusedWindowOutput() =>
+        RunCommand("swaymsg", "-t", "get_tree");
+
+    private static void AddProvider(List<string> providers, string provider)
+    {
+        if (!providers.Contains(provider))
+        {
+            providers.Add(provider);
+        }
+    }
+
+    private static bool IsDesktopSession(string compositorName) =>
+        ContainsEnvironmentValue("XDG_CURRENT_DESKTOP", compositorName) ||
+        ContainsEnvironmentValue("XDG_SESSION_DESKTOP", compositorName) ||
+        ContainsEnvironmentValue("DESKTOP_SESSION", compositorName);
+
+    private static bool ContainsEnvironmentValue(string variableName, string expectedValue) =>
+        Environment.GetEnvironmentVariable(variableName)?.Contains(expectedValue, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string? RunCommand(string fileName, params string[] arguments)
+    {
+        try
+        {
+            var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true,
+                },
+            };
+
+            foreach (var argument in arguments)
+            {
+                proc.StartInfo.ArgumentList.Add(argument);
+            }
+
+            proc.Start();
+            var outputTask = proc.StandardOutput.ReadToEndAsync();
+            if (!proc.WaitForExit(5000))
+            {
+                try
+                {
+                    proc.Kill(true);
+                }
+                catch (Exception) { /* nom */ }
+
+                return null;
+            }
+
+            return proc.ExitCode == 0 ? outputTask.GetAwaiter().GetResult() : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryParseActiveWindowProcessId(string? activeWindowProcessIdOutput, out int processId)
+    {
+        processId = 0;
+        var trimmedOutput = activeWindowProcessIdOutput?.Trim();
+
+        if (string.IsNullOrEmpty(trimmedOutput)) return false;
+        if (int.TryParse(trimmedOutput, out processId)) return true;
+
+        try
+        {
+            using var document = JsonDocument.Parse(trimmedOutput);
+            if (document.RootElement.TryGetProperty("pid", out var pidElement) &&
+                pidElement.TryGetInt32(out processId))
+            {
+                return true;
+            }
+
+            return TryParseFocusedProcessId(document.RootElement, out processId);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsPathOfExileWindow(string? activeWindowProcessIdOutput)
+    {
+        var trimmedOutput = activeWindowProcessIdOutput?.Trim();
+        if (string.IsNullOrEmpty(trimmedOutput) || int.TryParse(trimmedOutput, out _)) return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(trimmedOutput);
+            return IsPathOfExileWindow(document.RootElement, true);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsPathOfExileWindow(JsonElement element, bool assumeActive)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var isActive = assumeActive ||
+                           IsBooleanPropertyTrue(element, "focused") ||
+                           IsBooleanPropertyTrue(element, "is_focused");
+
+            if (isActive && HasPathOfExileWindowIdentity(element)) return true;
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (IsPathOfExileWindow(property.Value, false)) return true;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                if (IsPathOfExileWindow(item, false)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasPathOfExileWindowIdentity(JsonElement element)
+    {
+        if (HasPathOfExileWindowIdentity(element, "app_id") ||
+            HasPathOfExileWindowIdentity(element, "class") ||
+            HasPathOfExileWindowIdentity(element, "initialClass") ||
+            HasPathOfExileWindowIdentity(element, "initial_class") ||
+            HasPathOfExileWindowIdentity(element, "instance"))
+        {
+            return true;
+        }
+
+        if (!element.TryGetProperty("window_properties", out var windowProperties) ||
+            windowProperties.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        return HasPathOfExileWindowIdentity(windowProperties, "class") ||
+               HasPathOfExileWindowIdentity(windowProperties, "instance");
+    }
+
+    private static bool HasPathOfExileWindowIdentity(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        var value = property.GetString();
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        return value.Equals("steam_app_2694490", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("steam_app_238960", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("PathOfExile", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsBooleanPropertyTrue(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) &&
+        property.ValueKind == JsonValueKind.True;
+
+    private static bool TryParseFocusedProcessId(JsonElement element, out int processId)
+    {
+        processId = 0;
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("focused", out var focusedElement) &&
+                focusedElement.ValueKind == JsonValueKind.True &&
+                element.TryGetProperty("pid", out var pidElement) &&
+                pidElement.TryGetInt32(out processId))
+            {
+                return true;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (TryParseFocusedProcessId(property.Value, out processId)) return true;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                if (TryParseFocusedProcessId(item, out processId)) return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryWithWmctrl(int processId)

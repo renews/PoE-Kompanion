@@ -173,7 +173,7 @@ public class App : Application
             var autoWeaponSwap = this.config.AutoWeaponSwap;
             var message = new AutoWeaponSwapConfigMessage(
                 autoWeaponSwap.Enabled,
-                autoWeaponSwap.Key.Key,
+                (int)autoWeaponSwap.Key.Key,
                 autoWeaponSwap.IntervalMs);
 
             await this.ipc.SendAsync(message);
