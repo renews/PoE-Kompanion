@@ -14,9 +14,19 @@ internal static class Program
     private static int Main()
     {
         AssertEqual(
-            "1.1.1",
+            "1.1.2",
             typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             "Assembly informational version should match release version");
+
+        var projectSource = File.ReadAllText("PoE-Kompanion/PoEKompanion.csproj");
+        AssertEqual(
+            true,
+            projectSource.Contains("<PackageReference Include=\"MessagePack\" Version=\"3.1.8\" />"),
+            "MessagePack should use the patched 3.1.8 release");
+        AssertEqual(
+            true,
+            projectSource.Contains("<PackageReference Include=\"Tmds.DBus.Protocol\" Version=\"0.21.3\" />"),
+            "The vulnerable Avalonia D-Bus dependency should use its patched backport");
 
         AssertMatches(
             "Main",

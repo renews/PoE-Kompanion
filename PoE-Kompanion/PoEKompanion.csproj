@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <!-- Version -->
-        <AppVersion>1.1.1</AppVersion>
+        <AppVersion>1.1.2</AppVersion>
 
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
@@ -94,8 +94,10 @@
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
 
-        <PackageReference Include="MessagePack" Version="3.1.4" />
+        <PackageReference Include="MessagePack" Version="3.1.8" />
         <PackageReference Include="SharpHook" Version="7.0.3" />
+        <!-- Patched backport for Avalonia's transitive D-Bus dependency. -->
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
     </ItemGroup>
 
     <ItemGroup>
