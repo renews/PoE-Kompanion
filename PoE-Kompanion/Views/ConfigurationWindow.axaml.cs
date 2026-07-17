@@ -175,10 +175,8 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
 
         _ = this.LoadConfiguration();
 
-        this.Opened += async (_, _) =>
+        this.Opened += (_, _) =>
         {
-            await (App.Instance?.StopMainHookAsync() ?? Task.CompletedTask);
-
             this.Measure(Size.Infinity);
             this.PositionOverPoE();
 
@@ -189,6 +187,7 @@ public partial class ConfigurationWindow : Window, INotifyPropertyChanged
 
         this.Closing += (_, _) =>
         {
+            App.Instance?.CancelHotkeyCapture();
             this.pollCancellation?.Cancel();
             this.pollCancellation?.Dispose();
             this.overlay?.Close();

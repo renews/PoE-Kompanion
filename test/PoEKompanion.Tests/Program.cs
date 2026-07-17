@@ -365,11 +365,84 @@ internal static class Program
             configurationWindowSource.Contains("AutoWeaponSwapEnabled"),
             "Settings code-behind should not expose an unused auto weapon swap checkbox binding");
 
+        var keyPressTracker = new KeyPressTracker();
+        AssertEqual(true, keyPressTracker.TryPress(KeyCode.VcF5), "First F5 press should be accepted");
+        AssertEqual(false, keyPressTracker.TryPress(KeyCode.VcF5), "Repeated F5 key-down should be ignored");
+        keyPressTracker.Release(KeyCode.VcF5);
+        AssertEqual(true, keyPressTracker.TryPress(KeyCode.VcF5), "F5 should be accepted again after release");
+        keyPressTracker.Clear();
+        AssertEqual(false, keyPressTracker.IsControlPressed, "Clearing pressed keys should clear control state");
+        keyPressTracker.TryPress(KeyCode.VcLeftControl);
+        keyPressTracker.TryPress(KeyCode.VcRightControl);
+        keyPressTracker.Release(KeyCode.VcLeftControl);
+        AssertEqual(true, keyPressTracker.IsControlPressed, "Control should remain pressed while either control key is down");
+        keyPressTracker.Release(KeyCode.VcRightControl);
+        AssertEqual(false, keyPressTracker.IsControlPressed, "Control should be released after both control keys are up");
+
+        var hotkeyCaptureCoordinator = new HotkeyCaptureCoordinator();
+        AssertEqual(
+            true,
+            hotkeyCaptureCoordinator.TryStartCapture(out var captureTask),
+            "The first shortcut picker should acquire keyboard capture");
+        AssertEqual(
+            false,
+            hotkeyCaptureCoordinator.TryStartCapture(out _),
+            "A second shortcut picker should not acquire keyboard capture concurrently");
+        AssertEqual(
+            true,
+            hotkeyCaptureCoordinator.HandleKeyPressed(KeyCode.VcLeftControl, true, false, false),
+            "Modifier presses should be consumed by active shortcut capture");
+        AssertEqual(false, captureTask.IsCompleted, "Modifier presses should not finish shortcut capture");
+        AssertEqual(
+            true,
+            hotkeyCaptureCoordinator.HandleKeyPressed(KeyCode.VcF8, true, false, false),
+            "A non-modifier press should finish active shortcut capture");
+        AssertEqual(
+            new HotkeyCombo(KeyCode.VcF8, ctrl: true),
+            captureTask.GetAwaiter().GetResult(),
+            "Shortcut capture should preserve the pressed modifiers");
+        AssertEqual(
+            false,
+            hotkeyCaptureCoordinator.HandleKeyPressed(KeyCode.VcF9, false, false, false),
+            "Key presses should return to normal handling after capture finishes");
+
+        AssertEqual(
+            true,
+            hotkeyCaptureCoordinator.TryStartCapture(out var cancelledCaptureTask),
+            "Shortcut capture should restart after completion");
+        hotkeyCaptureCoordinator.HandleKeyPressed(KeyCode.VcEscape, false, false, false);
+        AssertEqual<HotkeyCombo?>(
+            null,
+            cancelledCaptureTask.GetAwaiter().GetResult(),
+            "Escape should cancel shortcut capture");
+        AssertEqual(
+            true,
+            hotkeyCaptureCoordinator.TryStartCapture(out var closedWindowCaptureTask),
+            "Shortcut capture should restart after Escape");
+        hotkeyCaptureCoordinator.CancelCapture();
+        AssertEqual<HotkeyCombo?>(
+            null,
+            closedWindowCaptureTask.GetAwaiter().GetResult(),
+            "Closing settings should cancel active shortcut capture");
+
         var appSource = File.ReadAllText("PoE-Kompanion/App.axaml.cs");
         AssertEqual(
             true,
             appSource.Contains("ToggleAutoWeaponSwapAsync"),
             "App should expose auto weapon swap toggle hotkey handling");
+        AssertEqual(
+            true,
+            appSource.Contains("new EventLoopGlobalHook(GlobalHookType.Keyboard)"),
+            "The application should use a keyboard-only non-blocking event-loop global hook");
+        var hotkeyPickerSource = File.ReadAllText("PoE-Kompanion/Controls/HotkeyPickerButton.axaml.cs");
+        AssertEqual(
+            false,
+            hotkeyPickerSource.Contains("SimpleGlobalHook") || hotkeyPickerSource.Contains("EventLoopGlobalHook"),
+            "Shortcut pickers should share the application hook instead of creating another global hook");
+        AssertEqual(
+            false,
+            configurationWindowSource.Contains("StopMainHookAsync"),
+            "Opening settings should keep the single application hook alive");
 
         var poeTrackerSource = File.ReadAllText("PoE-Kompanion/PoETracker.cs");
         AssertEqual(

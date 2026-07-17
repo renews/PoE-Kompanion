@@ -13,6 +13,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 
 using SharpHook;
+using SharpHook.Data;
 
 using Views;
 
@@ -30,21 +31,33 @@ public class App : Application
 
     private ConfigurationWindow? configWindow;
 
-    private bool isConfigWindowOpen;
+    private volatile bool isConfigWindowOpen;
 
     private volatile bool isDisposingHook;
 
     private int? poeProcessId;
 
-    private bool isCtrlPressed;
-    private bool isShiftPressed;
-    private bool isAltPressed;
-
     private ChatCommandMessage? pendingChatCommand;
+
+    private readonly KeyPressTracker keyPressTracker = new();
+    private readonly HotkeyCaptureCoordinator hotkeyCaptureCoordinator = new();
 
     public static App? Instance { get; private set; }
 
     public int? GetPoEProcessId() => this.poeProcessId;
+
+    public bool TryStartHotkeyCapture(out Task<HotkeyCombo?> captureTask)
+    {
+        if (this.hook is not null)
+        {
+            return this.hotkeyCaptureCoordinator.TryStartCapture(out captureTask);
+        }
+
+        captureTask = Task.FromResult<HotkeyCombo?>(null);
+        return false;
+    }
+
+    public void CancelHotkeyCapture() => this.hotkeyCaptureCoordinator.CancelCapture();
 
     public override void Initialize()
     {
@@ -190,93 +203,105 @@ public class App : Application
         if (this.hook is not null) return;
 
         this.isDisposingHook = false;
-        this.hook = new SimpleGlobalHook();
+        this.ResetKeyboardState();
+        var hook = new EventLoopGlobalHook(GlobalHookType.Keyboard);
+        this.hook = hook;
 
-        this.hook.KeyPressed += async (_, args) =>
+        hook.KeyPressed += (_, args) =>
         {
             if (this.isDisposingHook) return;
 
             var keyCode = args.Data.KeyCode;
+            if (!this.keyPressTracker.TryPress(keyCode)) return;
 
-            if (IsModifierKey(keyCode))
-            {
-                this.UpdateModifierState(keyCode, true);
-                return;
-            }
+            var isCtrlPressed = this.keyPressTracker.IsControlPressed;
+            var isShiftPressed = this.keyPressTracker.IsShiftPressed;
+            var isAltPressed = this.keyPressTracker.IsAltPressed;
+
+            if (this.hotkeyCaptureCoordinator.HandleKeyPressed(
+                    keyCode,
+                    isCtrlPressed,
+                    isShiftPressed,
+                    isAltPressed)) return;
+
+            if (KeyPressTracker.IsModifierKey(keyCode)) return;
 
             if (this.isConfigWindowOpen) return;
 
-            if (this.config?.LogoutHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
+            _ = this.HandleHotkeyPressedAsync(keyCode, isCtrlPressed, isShiftPressed, isAltPressed);
+        };
+
+        hook.KeyReleased += (_, args) =>
+        {
+            if (this.isDisposingHook) return;
+
+            var keyCode = args.Data.KeyCode;
+            this.keyPressTracker.Release(keyCode);
+
+            if (!KeyPressTracker.IsModifierKey(keyCode) || this.isConfigWindowOpen) return;
+            if (this.pendingChatCommand is null || !this.keyPressTracker.AreModifiersReleased) return;
+
+            var command = this.pendingChatCommand;
+            this.pendingChatCommand = null;
+            _ = this.SendChatCommandAsync(command);
+        };
+
+        _ = RunMainHookAsync(hook);
+    }
+
+    private static async Task RunMainHookAsync(IGlobalHook hook)
+    {
+        try
+        {
+            await hook.RunAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Hook crashed: {ex.Message}");
+        }
+    }
+
+    private async Task HandleHotkeyPressedAsync(KeyCode keyCode, bool ctrl, bool shift, bool alt)
+    {
+        try
+        {
+            if (this.config?.LogoutHotkey?.Matches(keyCode, ctrl, shift, alt) == true)
             {
-                // Fire immediately for logout (doesn't send text)
                 if (this.ipc is null) return;
                 await this.ipc.SendAsync(new ForceLogoutMessage());
             }
-            else if (this.config?.OpenSettingsHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
+            else if (this.config?.OpenSettingsHotkey?.Matches(keyCode, ctrl, shift, alt) == true)
             {
-                // Fire immediately for settings (doesn't send text)
                 await this.OpenConfiguration();
             }
-            else if (this.config?.AutoWeaponSwap?.ToggleHotkey?.Matches(keyCode, this.isCtrlPressed, this.isShiftPressed, this.isAltPressed) == true)
+            else if (this.config?.AutoWeaponSwap?.ToggleHotkey?.Matches(keyCode, ctrl, shift, alt) == true)
             {
                 await this.ToggleAutoWeaponSwapAsync();
             }
             else
             {
-                var chatCommandHotkey = this.FindMatchingChatCommandHotkey(keyCode);
+                var chatCommandHotkey = this.FindMatchingChatCommandHotkey(keyCode, ctrl, shift, alt);
                 if (chatCommandHotkey is not null)
                 {
                     await this.SendOrDeferChatCommand(chatCommandHotkey);
                 }
             }
-        };
-
-        this.hook.KeyReleased += async (_, args) =>
+        }
+        catch (Exception ex)
         {
-            if (this.isDisposingHook) return;
-
-            var keyCode = args.Data.KeyCode;
-
-            if (IsModifierKey(keyCode))
-            {
-                this.UpdateModifierState(keyCode, false);
-
-                if (this.isConfigWindowOpen) return;
-
-                // Check if all modifiers are now released and we have a pending hotkey
-                if (this.pendingChatCommand is not null &&
-                    !this.isCtrlPressed && !this.isShiftPressed && !this.isAltPressed)
-                {
-                    var command = this.pendingChatCommand;
-                    this.pendingChatCommand = null;
-
-                    await this.SendChatCommandAsync(command);
-                }
-            }
-        };
-
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                this.hook.Run();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Hook crashed: {ex.Message}");
-            }
-        });
+            Console.WriteLine($"Error handling hotkey: {ex.Message}");
+        }
     }
 
-    private ChatCommandHotkey? FindMatchingChatCommandHotkey(SharpHook.Data.KeyCode keyCode) =>
+    private ChatCommandHotkey? FindMatchingChatCommandHotkey(KeyCode keyCode, bool ctrl, bool shift, bool alt) =>
         this.config is null
             ? null
             : ChatCommandHotkey.FindMatching(
                 this.config.GetChatCommandHotkeys(),
                 keyCode,
-                this.isCtrlPressed,
-                this.isShiftPressed,
-                this.isAltPressed);
+                ctrl,
+                shift,
+                alt);
 
     private async Task SendOrDeferChatCommand(ChatCommandHotkey chatCommandHotkey)
     {
@@ -297,7 +322,14 @@ public class App : Application
     {
         if (this.ipc is null) return;
 
-        await this.ipc.SendAsync(command);
+        try
+        {
+            await this.ipc.SendAsync(command);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending chat command: {ex.Message}");
+        }
     }
 
     private async Task ToggleAutoWeaponSwapAsync()
@@ -321,51 +353,10 @@ public class App : Application
         }
     }
 
-    public async Task StopMainHookAsync()
+    private void ResetKeyboardState()
     {
-        if (this.hook is null) return;
-
-        this.isDisposingHook = true;
-
-        // Give any in-flight events a moment to check the flag
-        await Task.Delay(50);
-
-        var hookToDispose = this.hook;
-        this.hook = null;
-
-        try
-        {
-            await Task.Run(() => hookToDispose.Dispose());
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error disposing hook: {ex.Message}");
-        }
-    }
-
-    private static bool IsModifierKey(SharpHook.Data.KeyCode keyCode) =>
-        keyCode is SharpHook.Data.KeyCode.VcLeftControl or SharpHook.Data.KeyCode.VcRightControl or
-                   SharpHook.Data.KeyCode.VcLeftShift or SharpHook.Data.KeyCode.VcRightShift or
-                   SharpHook.Data.KeyCode.VcLeftAlt or SharpHook.Data.KeyCode.VcRightAlt or
-                   SharpHook.Data.KeyCode.VcLeftMeta or SharpHook.Data.KeyCode.VcRightMeta;
-
-    private void UpdateModifierState(SharpHook.Data.KeyCode keyCode, bool isPressed)
-    {
-        switch (keyCode)
-        {
-            case SharpHook.Data.KeyCode.VcLeftControl:
-            case SharpHook.Data.KeyCode.VcRightControl:
-                this.isCtrlPressed = isPressed;
-                break;
-            case SharpHook.Data.KeyCode.VcLeftShift:
-            case SharpHook.Data.KeyCode.VcRightShift:
-                this.isShiftPressed = isPressed;
-                break;
-            case SharpHook.Data.KeyCode.VcLeftAlt:
-            case SharpHook.Data.KeyCode.VcRightAlt:
-                this.isAltPressed = isPressed;
-                break;
-        }
+        this.keyPressTracker.Clear();
+        this.pendingChatCommand = null;
     }
 
     private void StartBackgroundProcess(string path)
@@ -429,21 +420,26 @@ public class App : Application
 
             this.isConfigWindowOpen = true;
             this.configWindow = new ConfigurationWindow();
-            this.configWindow.Closed += async (_, _) =>
-            {
-                this.configWindow = null;
-                this.isConfigWindowOpen = false;
-                this.config = await ConfigurationManager.LoadAsync();
-                await this.SendAutoWeaponSwapConfigAsync();
-                this.StartMainHook();
-            };
+            this.configWindow.Closed += (_, _) => _ = this.OnConfigurationClosedAsync();
             this.configWindow.Show();
         });
+    }
+
+    private async Task OnConfigurationClosedAsync()
+    {
+        this.configWindow = null;
+        this.hotkeyCaptureCoordinator.CancelCapture();
+        this.config = await ConfigurationManager.LoadAsync();
+        await this.SendAutoWeaponSwapConfigAsync();
+        this.isConfigWindowOpen = false;
     }
 
     private void ExitAction(object? sender, EventArgs e)
     {
         this.isShuttingDown = true;
+        this.isDisposingHook = true;
+        this.hotkeyCaptureCoordinator.CancelCapture();
+        this.ResetKeyboardState();
 
         this.hook?.Dispose();
         this.hook = null;
