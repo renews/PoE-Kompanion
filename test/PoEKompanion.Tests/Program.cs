@@ -25,8 +25,14 @@ internal static class Program
             "MessagePack should use the patched 3.1.8 release");
         AssertEqual(
             true,
-            projectSource.Contains("<PackageReference Include=\"Tmds.DBus.Protocol\" Version=\"0.21.3\" />"),
-            "The vulnerable Avalonia D-Bus dependency should use its patched backport");
+            projectSource.Contains("<PackageReference Include=\"Tmds.DBus.Protocol\" Version=\"0.94.1\" />"),
+            "The Avalonia 12 D-Bus dependency should use its compatible version");
+        AssertEqual(
+            true,
+            projectSource.Contains("<PackageReference Include=\"Avalonia\" Version=\"12.1.1\" />") &&
+            projectSource.Contains("<PackageReference Include=\"Avalonia.Desktop\" Version=\"12.1.1\" />") &&
+            projectSource.Contains("<PackageReference Include=\"Avalonia.Themes.Simple\" Version=\"12.1.1\" />"),
+            "Avalonia packages should use the version with the standards-compliant Linux tray implementation");
 
         AssertMatches(
             "Main",
@@ -314,10 +320,10 @@ internal static class Program
             "Settings should expose one command input field per custom command");
         AssertEqual(
             true,
-            configurationWindowXaml.Contains("Watermark=\"/played\"") &&
-            configurationWindowXaml.Contains("Watermark=\"/deaths\"") &&
-            configurationWindowXaml.Contains("Watermark=\"/hideout\"") &&
-            configurationWindowXaml.Contains("Watermark=\"/leave\""),
+            configurationWindowXaml.Contains("PlaceholderText=\"/played\"") &&
+            configurationWindowXaml.Contains("PlaceholderText=\"/deaths\"") &&
+            configurationWindowXaml.Contains("PlaceholderText=\"/hideout\"") &&
+            configurationWindowXaml.Contains("PlaceholderText=\"/leave\""),
             "Settings should show the current default custom command placeholders");
         AssertEqual(
             true,

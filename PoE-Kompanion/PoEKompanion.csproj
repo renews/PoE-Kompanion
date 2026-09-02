@@ -84,9 +84,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="11.3.7" />
-        <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
-        <PackageReference Include="Avalonia.Themes.Simple" Version="11.3.7" />
+        <PackageReference Include="Avalonia" Version="12.1.1" />
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+        <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.1" />
 
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
         <PackageReference Include="Avalonia.Diagnostics" Version="11.3.7">
@@ -96,8 +96,8 @@
 
         <PackageReference Include="MessagePack" Version="3.1.8" />
         <PackageReference Include="SharpHook" Version="7.0.3" />
-        <!-- Patched backport for Avalonia's transitive D-Bus dependency. -->
-        <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+        <!-- Matches Avalonia 12's Linux D-Bus tray integration. -->
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.1" />
     </ItemGroup>
 
     <ItemGroup>

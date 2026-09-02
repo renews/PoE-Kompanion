@@ -10,7 +10,7 @@
     x:DataType="views:ConfigurationWindow"
     Title="PoE Kompanion Configuration"
     CanResize="False"
-    SystemDecorations="None"
+    WindowDecorations="None"
     ShowInTaskbar="True"
     Topmost="True"
     Width="400"
@@ -110,7 +110,7 @@
                     Grid.Column="0" Grid.Row="5"
                     MinWidth="190"
                     Text="{Binding ChatCommand1Command, UpdateSourceTrigger=PropertyChanged}"
-                    Watermark="/played" />
+                    PlaceholderText="/played" />
                 <controls:HotkeyPickerButton
                     Name="ChatCommand1HotkeyPicker"
                     Grid.Column="1" Grid.Row="5"
@@ -120,7 +120,7 @@
                     Grid.Column="0" Grid.Row="6"
                     MinWidth="190"
                     Text="{Binding ChatCommand2Command, UpdateSourceTrigger=PropertyChanged}"
-                    Watermark="/remaining" />
+                    PlaceholderText="/remaining" />
                 <controls:HotkeyPickerButton
                     Name="ChatCommand2HotkeyPicker"
                     Grid.Column="1" Grid.Row="6"
@@ -130,7 +130,7 @@
                     Grid.Column="0" Grid.Row="7"
                     MinWidth="190"
                     Text="{Binding ChatCommand3Command, UpdateSourceTrigger=PropertyChanged}"
-                    Watermark="/deaths" />
+                    PlaceholderText="/deaths" />
                 <controls:HotkeyPickerButton
                     Name="ChatCommand3HotkeyPicker"
                     Grid.Column="1" Grid.Row="7"
@@ -140,7 +140,7 @@
                     Grid.Column="0" Grid.Row="8"
                     MinWidth="190"
                     Text="{Binding ChatCommand4Command, UpdateSourceTrigger=PropertyChanged}"
-                    Watermark="/hideout" />
+                    PlaceholderText="/hideout" />
                 <controls:HotkeyPickerButton
                     Name="ChatCommand4HotkeyPicker"
                     Grid.Column="1" Grid.Row="8"
@@ -150,7 +150,7 @@
                     Grid.Column="0" Grid.Row="9"
                     MinWidth="190"
                     Text="{Binding ChatCommand5Command, UpdateSourceTrigger=PropertyChanged}"
-                    Watermark="/leave" />
+                    PlaceholderText="/leave" />
                 <controls:HotkeyPickerButton
                     Name="ChatCommand5HotkeyPicker"
                     Grid.Column="1" Grid.Row="9"
