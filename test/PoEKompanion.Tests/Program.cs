@@ -14,7 +14,7 @@ internal static class Program
     private static int Main()
     {
         AssertEqual(
-            "1.1.2",
+            "1.1.3",
             typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             "Assembly informational version should match release version");
 
