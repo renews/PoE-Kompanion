@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           dotnet list PoE-Kompanion/PoEKompanion.csproj package --vulnerable --include-transitive --format json > audit.json
-          python3 -c 'import json; d=json.load(open("audit.json")); assert not d.get("problems"); assert not any(f.get("topLevelPackages") or f.get("transitivePackages") for p in d["projects"] for f in p["frameworks"]), d'
+          python3 -c 'import json; d=json.load(open("audit.json")); assert not d.get("problems"); assert not any(f.get("topLevelPackages") or f.get("transitivePackages") for p in d["projects"] for f in p.get("frameworks", [])), d'
       - name: Build NativeAOT AppImage and archive
         run: ./publish.sh
       - name: Verify packaged SharpHook backends
