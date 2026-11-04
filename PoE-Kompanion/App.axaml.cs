@@ -14,6 +14,7 @@ using Avalonia.Threading;
 
 using SharpHook;
 using SharpHook.Data;
+using SharpHook.Providers;
 
 using Views;
 
@@ -204,7 +205,13 @@ public class App : Application
 
         this.isDisposingHook = false;
         this.ResetKeyboardState();
-        var hook = new EventLoopGlobalHook(GlobalHookType.Keyboard);
+        // Preserve the XRecord backend used before SharpHook 8, including on XWayland.
+        if (OperatingSystem.IsLinux())
+        {
+            UioHookProvider.Instance.SetLinuxMode(LinuxMode.XRecord);
+        }
+
+        var hook = new EventLoopGlobalHook();
         this.hook = hook;
 
         hook.KeyPressed += (_, args) =>
@@ -253,7 +260,7 @@ public class App : Application
     {
         try
         {
-            await hook.RunAsync();
+            await hook.RunAsync(GlobalHookType.Keyboard);
         }
         catch (Exception ex)
         {

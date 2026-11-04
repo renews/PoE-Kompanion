@@ -1,4 +1,4 @@
-﻿# PoE Kompanion
+# PoE Kompanion
 A small utility for PoE on Linux, currently only containing a Logout Macro.
 Aim to be a replacement to Lutcikaur's amazing [LutBot](http://lutbot.com).
 
@@ -20,7 +20,7 @@ The helper is limited to the logout action and checks that the target process is
 ### Prerequisites
 
 - Docker (for AppImage builds)
-- .NET 9.0 SDK (for manual builds)
+- .NET 10.0 SDK (for manual builds)
 
 ### Build and Publish (Recommended)
 
@@ -48,6 +48,24 @@ For development or if you don't have Docker:
 dotnet publish -r linux-x64 -c Release --self-contained
 ```
 
-The compiled binary will be in `bin/Release/net9.0/linux-x64/publish/`
+The compiled binary will be in `bin/Release/net10.0/linux-x64/publish/`
 
 **Note:** Manual builds may not be portable across different Linux distributions due to glibc version differences. Use the Docker build for distribution.
+
+### Validation
+
+Run the regression suite from the repository root:
+
+```bash
+dotnet run --project test/PoEKompanion.Tests
+sh test/install-appimage-wrapper.test.sh
+sh test/logout-helper.test.sh # Linux only
+```
+
+CI also runs real keyboard press/release checks under Xvfb (`--native-hook-smoke`),
+builds the NativeAOT AppImage and archive, and compiles the existing Windows target.
+SharpHook 8 is explicitly configured to retain the previous XRecord backend,
+including under XWayland; native Wayland input is not enabled by this update.
+The Debian 11 packaging container retains the existing glibc compatibility baseline.
+Full in-game logout, desktop tray integration and compositor-specific behavior require
+manual testing on the target Linux desktop.

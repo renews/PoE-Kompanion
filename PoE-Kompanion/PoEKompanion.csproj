@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <!-- Version -->
         <AppVersion>1.1.3</AppVersion>
 
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <Version>$(AppVersion)</Version>
 
@@ -84,20 +84,20 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="12.1.1" />
-        <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
-        <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.1" />
+        <PackageReference Include="Avalonia" Version="12.1.5" />
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
+        <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.5" />
 
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <PackageReference Include="Avalonia.Diagnostics" Version="11.3.7">
+        <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22">
             <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
 
-        <PackageReference Include="MessagePack" Version="3.1.8" />
-        <PackageReference Include="SharpHook" Version="7.0.3" />
+        <PackageReference Include="MessagePack" Version="3.1.12" />
+        <PackageReference Include="SharpHook" Version="8.0.1" />
         <!-- Matches Avalonia 12's Linux D-Bus tray integration. -->
-        <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.1" />
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.2" />
     </ItemGroup>
 
     <ItemGroup>
