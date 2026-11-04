@@ -425,6 +425,27 @@ internal static class Program
             closedWindowCaptureTask.GetAwaiter().GetResult(),
             "Closing settings should cancel active shortcut capture");
 
+        IpcMessage[] messages =
+        [
+            new ForceLogoutMessage(),
+            new NotificationMessage("Connected", false),
+            new SetAlwaysOnTopMessage(123),
+            new PoEHookedMessage(123),
+            new PoEUnhookedMessage(),
+            new ChatCommandMessage("/hideout", 250),
+            new KeyboardLayoutMapMessage([new CharKeyMapping('A', 30, true)]),
+            new BackgroundReadyMessage(),
+            new ModifierStateMessage(true),
+            new AutoWeaponSwapConfigMessage(true, 45, 1000)
+        ];
+        foreach (var message in messages)
+        {
+            var bytes = MessagePackSerializer.Serialize(message);
+            var restored = MessagePackSerializer.Deserialize<IpcMessage>(bytes);
+            AssertEqual(message.GetType(), restored.GetType(), "IPC union type should round-trip");
+            AssertEqual(true, bytes.SequenceEqual(MessagePackSerializer.Serialize(restored)), "IPC payload should round-trip");
+        }
+
         var appSource = File.ReadAllText("PoE-Kompanion/App.axaml.cs");
         AssertEqual(
             true,

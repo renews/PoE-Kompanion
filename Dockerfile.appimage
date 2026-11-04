@@ -3,6 +3,12 @@
 # Using slim variant for minimal size
 FROM debian:bullseye-slim AS builder
 
+# Bullseye is archived; keep its signed archive to preserve the glibc 2.31 baseline.
+RUN printf '%s\n' \
+    'deb [check-valid-until=no] http://archive.debian.org/debian bullseye main' \
+    'deb [check-valid-until=no] http://archive.debian.org/debian-security bullseye-security main' \
+    > /etc/apt/sources.list
+
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     wget \
@@ -19,6 +25,10 @@ RUN apt-get update && apt-get install -y \
     libxinerama-dev \
     libxkbcommon-dev \
     libxt-dev \
+    libinput10 \
+    libudev1 \
+    libwayland-client0 \
+    libxrandr2 \
     libfontconfig1-dev \
     libfreetype6-dev \
     libpng-dev \

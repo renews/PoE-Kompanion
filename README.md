@@ -66,6 +66,8 @@ CI also runs real keyboard press/release checks under Xvfb (`--native-hook-smoke
 builds the NativeAOT AppImage and archive, and compiles the existing Windows target.
 SharpHook 8 is explicitly configured to retain the previous XRecord backend,
 including under XWayland; native Wayland input is not enabled by this update.
-The Debian 11 packaging container retains the existing glibc compatibility baseline.
+The Debian 11 packaging container uses Debian’s signed archive to retain the existing
+glibc 2.31 compatibility baseline. This is a compatibility build environment, not a
+currently serviced operating system.
 Full in-game logout, desktop tray integration and compositor-specific behavior require
 manual testing on the target Linux desktop.

@@ -25,6 +25,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb xdotool libxtst6 libxinerama1 libxkbcommon0 libx11-xcb1 libice6 libsm6
       - name: Regression and native keyboard tests
         run: xvfb-run -a dotnet run --project test/PoEKompanion.Tests -- --native-hook-smoke
+      - name: NativeAOT regression and keyboard tests
+        run: |
+          dotnet publish test/PoEKompanion.Tests -c Release -r linux-x64 -p:PublishAot=true -p:InvariantGlobalization=true -o /tmp/kompanion-native-tests
+          xvfb-run -a /tmp/kompanion-native-tests/PoEKompanion.Tests --native-hook-smoke
       - name: Shell regression tests
         run: |
           sh test/install-appimage-wrapper.test.sh
