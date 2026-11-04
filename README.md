@@ -35,7 +35,7 @@ This creates portable distribution packages in `publish/{VERSION}/`:
 - `PoE-Kompanion-{VERSION}-x86_64.tar.gz` - Traditional archive with all binaries
 
 **What it does:**
-- Builds in an isolated Debian 11 container for maximum compatibility
+- Builds in an isolated Ubuntu 22.04 container (glibc 2.35 baseline)
 - Automatically bundles all required dependencies using linuxdeploy
 - Produces both AppImage and tar.gz distribution formats
   - Output in ./publish/$VERSION/
@@ -66,8 +66,9 @@ CI also runs real keyboard press/release checks under Xvfb (`--native-hook-smoke
 builds the NativeAOT AppImage and archive, and compiles the existing Windows target.
 SharpHook 8 is explicitly configured to retain the previous XRecord backend,
 including under XWayland; native Wayland input is not enabled by this update.
-The Debian 11 packaging container uses Debian’s signed archive to retain the existing
-glibc 2.31 compatibility baseline. This is a compatibility build environment, not a
-currently serviced operating system.
+Release packages require x86-64 Linux with glibc 2.35 or newer (Ubuntu 22.04 or
+newer, or an equivalent distribution). Older glibc 2.31 systems are no longer
+supported: SharpHook 8 itself requires glibc 2.34, and Ubuntu 22.04 supplies the
+supported packaging baseline.
 Full in-game logout, desktop tray integration and compositor-specific behavior require
 manual testing on the target Linux desktop.

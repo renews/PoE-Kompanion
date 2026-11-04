@@ -5,6 +5,13 @@ All notable changes to PoE Kompanion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Updated to .NET 10 LTS and current stable Avalonia, MessagePack, SharpHook and D-Bus packages.
+- Preserved XRecord keyboard handling when migrating to SharpHook 8.
+- Added regression, NativeAOT, native keyboard, vulnerability and packaging checks in CI.
+- Raised the Linux release baseline to Ubuntu 22.04 / glibc 2.35; older glibc 2.31 systems are no longer supported.
+
 ## [1.1.3] - 2026-09-17
 
 ### Fixed

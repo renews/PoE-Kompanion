@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
@@ -47,7 +47,23 @@ jobs:
           tar -xzf publish/*/*.tar.gz -C /tmp/kompanion-package
           for library in libuiohook.so libuiohook-xrecord.so libuiohook-x11.so libuiohook-wayland.so; do
             test -s "/tmp/kompanion-package/$library"
+            cp "/tmp/kompanion-package/$library" /tmp/kompanion-native-tests/
           done
+          xvfb-run -a /tmp/kompanion-native-tests/PoEKompanion.Tests --native-hook-smoke
+      - name: Verify extracted AppImage native libraries
+        shell: bash
+        run: |
+          appimages=(publish/*/*.AppImage)
+          "${appimages[0]}" --appimage-extract
+          for library in libuiohook.so libuiohook-xrecord.so libuiohook-x11.so libuiohook-wayland.so; do
+            test -s "squashfs-root/usr/lib/$library"
+          done
+          LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib" python3 - <<'PYTHON'
+          import ctypes
+          from pathlib import Path
+          for library in Path("squashfs-root/usr/lib").glob("libuiohook*.so"):
+              ctypes.CDLL(str(library.resolve()))
+          PYTHON
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: linux-release

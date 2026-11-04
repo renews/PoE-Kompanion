@@ -1,16 +1,8 @@
-# Build AppImage in Debian 11 (bullseye) for maximum compatibility
-# Debian 11 has glibc 2.31, compatible with most Linux distributions
-# Using slim variant for minimal size
-FROM debian:bullseye-slim AS builder
-
-# Bullseye is archived; keep its signed archive to preserve the glibc 2.31 baseline.
-RUN printf '%s\n' \
-    'deb [check-valid-until=no] http://archive.debian.org/debian bullseye main' \
-    'deb [check-valid-until=no] http://archive.debian.org/debian-security bullseye-security main' \
-    > /etc/apt/sources.list
+# Build on the oldest supported Ubuntu baseline for SharpHook 8 (glibc 2.35).
+FROM ubuntu:22.04 AS builder
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     wget \
     ca-certificates \
     file \
