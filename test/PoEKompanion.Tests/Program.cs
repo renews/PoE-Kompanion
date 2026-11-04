@@ -11,28 +11,12 @@ using SharpHook.Data;
 
 internal static class Program
 {
-    private static int Main()
+    private static int Main(string[] args)
     {
         AssertEqual(
             "1.1.3",
             typeof(PoEProcessDetector).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             "Assembly informational version should match release version");
-
-        var projectSource = File.ReadAllText("PoE-Kompanion/PoEKompanion.csproj");
-        AssertEqual(
-            true,
-            projectSource.Contains("<PackageReference Include=\"MessagePack\" Version=\"3.1.8\" />"),
-            "MessagePack should use the patched 3.1.8 release");
-        AssertEqual(
-            true,
-            projectSource.Contains("<PackageReference Include=\"Tmds.DBus.Protocol\" Version=\"0.94.1\" />"),
-            "The Avalonia 12 D-Bus dependency should use its compatible version");
-        AssertEqual(
-            true,
-            projectSource.Contains("<PackageReference Include=\"Avalonia\" Version=\"12.1.1\" />") &&
-            projectSource.Contains("<PackageReference Include=\"Avalonia.Desktop\" Version=\"12.1.1\" />") &&
-            projectSource.Contains("<PackageReference Include=\"Avalonia.Themes.Simple\" Version=\"12.1.1\" />"),
-            "Avalonia packages should use the version with the standards-compliant Linux tray implementation");
 
         AssertMatches(
             "Main",
@@ -133,7 +117,7 @@ internal static class Program
             UnixSocketIpc.GetClientSocketPath("/run/user/1000"),
             "Client IPC socket should live under the user runtime directory");
         AssertEqual(
-            "/tmp/poe-kompanion-appuser/server.sock",
+            Path.Combine(Path.GetTempPath(), "poe-kompanion-appuser", "server.sock"),
             UnixSocketIpc.GetServerSocketPath(string.Empty, "appuser"),
             "Fallback IPC socket should be namespaced by user");
 
@@ -441,6 +425,27 @@ internal static class Program
             closedWindowCaptureTask.GetAwaiter().GetResult(),
             "Closing settings should cancel active shortcut capture");
 
+        IpcMessage[] messages =
+        [
+            new ForceLogoutMessage(),
+            new NotificationMessage("Connected", false),
+            new SetAlwaysOnTopMessage(123),
+            new PoEHookedMessage(123),
+            new PoEUnhookedMessage(),
+            new ChatCommandMessage("/hideout", 250),
+            new KeyboardLayoutMapMessage([new CharKeyMapping('A', 30, true)]),
+            new BackgroundReadyMessage(),
+            new ModifierStateMessage(true),
+            new AutoWeaponSwapConfigMessage(true, 45, 1000)
+        ];
+        foreach (var message in messages)
+        {
+            var bytes = MessagePackSerializer.Serialize(message);
+            var restored = MessagePackSerializer.Deserialize<IpcMessage>(bytes);
+            AssertEqual(message.GetType(), restored.GetType(), "IPC union type should round-trip");
+            AssertEqual(true, bytes.SequenceEqual(MessagePackSerializer.Serialize(restored)), "IPC payload should round-trip");
+        }
+
         var appSource = File.ReadAllText("PoE-Kompanion/App.axaml.cs");
         AssertEqual(
             true,
@@ -448,7 +453,8 @@ internal static class Program
             "App should expose auto weapon swap toggle hotkey handling");
         AssertEqual(
             true,
-            appSource.Contains("new EventLoopGlobalHook(GlobalHookType.Keyboard)"),
+            appSource.Contains("new EventLoopGlobalHook()") &&
+            appSource.Contains("hook.RunAsync(GlobalHookType.Keyboard)"),
             "The application should use a keyboard-only non-blocking event-loop global hook");
         var hotkeyPickerSource = File.ReadAllText("PoE-Kompanion/Controls/HotkeyPickerButton.axaml.cs");
         AssertEqual(
@@ -477,6 +483,12 @@ internal static class Program
             windowManagerSource.Contains("get_tree"),
             "Active window detection should support Sway focused-window lookup");
 
+        if (args.Contains("--native-hook-smoke"))
+        {
+            NativeHookSmoke.RunAsync().GetAwaiter().GetResult();
+        }
+
+        Console.WriteLine("All regression tests passed.");
         return 0;
     }
 

@@ -15,13 +15,13 @@ dotnet publish -c Release -r linux-x64 --self-contained
 echo "Preparing linuxdeploy arguments..."
 LINUXDEPLOY_ARGS=(
     --appdir AppDir
-    --executable bin/Release/net9.0/linux-x64/publish/PoEKompanion
+    --executable bin/Release/net10.0/linux-x64/publish/PoEKompanion
     --desktop-file poe-kompanion.desktop
     --icon-file poe-kompanion.png
 )
 
 # Add all .so files as libraries
-for lib in bin/Release/net9.0/linux-x64/publish/*.so; do
+for lib in bin/Release/net10.0/linux-x64/publish/*.so; do
     if [ -f "$lib" ]; then
         LINUXDEPLOY_ARGS+=(--library "$lib")
     fi
@@ -56,7 +56,7 @@ echo "Created: $APPIMAGE_NAME"
 # Create tar.gz archive from published directory
 echo "Creating tar.gz archive..."
 TARBALL_NAME="PoE-Kompanion-${VERSION}-x86_64.tar.gz"
-cd bin/Release/net9.0/linux-x64/publish
+cd bin/Release/net10.0/linux-x64/publish
 tar -czf "/build/$TARBALL_NAME" .
 cd /build
 echo "Created: $TARBALL_NAME"

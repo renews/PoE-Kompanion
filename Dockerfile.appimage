@@ -1,10 +1,8 @@
-# Build AppImage in Debian 11 (bullseye) for maximum compatibility
-# Debian 11 has glibc 2.31, compatible with most Linux distributions
-# Using slim variant for minimal size
-FROM debian:bullseye-slim AS builder
+# Build on the oldest supported Ubuntu baseline for SharpHook 8 (glibc 2.35).
+FROM ubuntu:22.04 AS builder
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     wget \
     ca-certificates \
     file \
@@ -19,6 +17,10 @@ RUN apt-get update && apt-get install -y \
     libxinerama-dev \
     libxkbcommon-dev \
     libxt-dev \
+    libinput10 \
+    libudev1 \
+    libwayland-client0 \
+    libxrandr2 \
     libfontconfig1-dev \
     libfreetype6-dev \
     libpng-dev \
@@ -26,10 +28,10 @@ RUN apt-get update && apt-get install -y \
     libbrotli-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install .NET 9.0 SDK
+# Install .NET 10.0 SDK
 RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
     chmod +x dotnet-install.sh && \
-    ./dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet && \
+    ./dotnet-install.sh --version 10.0.403 --install-dir /usr/share/dotnet && \
     ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet && \
     rm dotnet-install.sh
 

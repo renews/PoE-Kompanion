@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Install native test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool libxtst6 libxinerama1 libxkbcommon0 libx11-xcb1 libice6 libsm6
+      - name: Regression and native keyboard tests
+        run: xvfb-run -a dotnet run --project test/PoEKompanion.Tests -- --native-hook-smoke
+      - name: NativeAOT regression and keyboard tests
+        run: |
+          dotnet publish test/PoEKompanion.Tests -c Release -r linux-x64 -p:PublishAot=true -p:InvariantGlobalization=true -o /tmp/kompanion-native-tests
+          xvfb-run -a /tmp/kompanion-native-tests/PoEKompanion.Tests --native-hook-smoke
+      - name: Shell regression tests
+        run: |
+          sh test/install-appimage-wrapper.test.sh
+          sh test/logout-helper.test.sh
+      - name: Reject vulnerable dependencies
+        shell: bash
+        run: |
+          dotnet list PoE-Kompanion/PoEKompanion.csproj package --vulnerable --include-transitive --format json > audit.json
+          python3 -c 'import json; d=json.load(open("audit.json")); assert not d.get("problems"); assert not any(f.get("topLevelPackages") or f.get("transitivePackages") for p in d["projects"] for f in p.get("frameworks", [])), d'
+      - name: Build NativeAOT AppImage and archive
+        run: ./publish.sh
+      - name: Verify packaged SharpHook backends
+        shell: bash
+        run: |
+          mkdir /tmp/kompanion-package
+          tar -xzf publish/*/*.tar.gz -C /tmp/kompanion-package
+          for library in libuiohook.so libuiohook-xrecord.so libuiohook-x11.so libuiohook-wayland.so; do
+            test -s "/tmp/kompanion-package/$library"
+            cp "/tmp/kompanion-package/$library" /tmp/kompanion-native-tests/
+          done
+          xvfb-run -a /tmp/kompanion-native-tests/PoEKompanion.Tests --native-hook-smoke
+      - name: Verify extracted AppImage native libraries
+        shell: bash
+        run: |
+          appimages=(publish/*/*.AppImage)
+          "${appimages[0]}" --appimage-extract
+          for library in libuiohook.so libuiohook-xrecord.so libuiohook-x11.so libuiohook-wayland.so; do
+            test -s "squashfs-root/usr/lib/$library"
+          done
+          LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib" python3 - <<'PYTHON'
+          import ctypes
+          from pathlib import Path
+          for library in Path("squashfs-root/usr/lib").glob("libuiohook*.so"):
+              ctypes.CDLL(str(library.resolve()))
+          PYTHON
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: linux-release
+          path: publish/*/*
+          retention-days: 7
+
+  windows-build:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Build existing Windows target
+        run: dotnet build PoE-Kompanion/PoEKompanion.csproj -c Debug
