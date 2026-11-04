@@ -20,7 +20,7 @@ The helper is limited to the logout action and checks that the target process is
 ### Prerequisites
 
 - Docker (for AppImage builds)
-- .NET 10.0 SDK (for manual builds)
+- .NET 10.0.403 SDK (for manual builds; see `global.json`)
 
 ### Build and Publish (Recommended)
 
@@ -45,10 +45,10 @@ This creates portable distribution packages in `publish/{VERSION}/`:
 For development or if you don't have Docker:
 
 ```bash
-dotnet publish -r linux-x64 -c Release --self-contained
+dotnet publish PoE-Kompanion/PoEKompanion.csproj -r linux-x64 -c Release --self-contained
 ```
 
-The compiled binary will be in `bin/Release/net10.0/linux-x64/publish/`
+The compiled binary will be in `PoE-Kompanion/bin/Release/net10.0/linux-x64/publish/`
 
 **Note:** Manual builds may not be portable across different Linux distributions due to glibc version differences. Use the Docker build for distribution.
 
